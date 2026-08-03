@@ -12,7 +12,7 @@ import {
   WarMachines,
   type GearSlot,
 } from './constants';
-import { getInt, getUint32, writeInt32 } from './bytes';
+import { getInt, getUint16, getUint32, writeInt16, writeInt32 } from './bytes';
 
 export class Hero {
   readonly name: string;
@@ -50,7 +50,8 @@ export class Hero {
     const b = game.bytes;
 
     this.level = b[bytePosition + o.HeroLevel];
-    this.mana = b[bytePosition + o.ManaPoints];
+    // Mana is uint16; writing 4 bytes would overwrite HeroLevel at ManaPoints+2.
+    this.mana = getUint16(b, bytePosition + o.ManaPoints);
     this.experience = getUint32(b, bytePosition + o.Experience);
 
     for (let i = 0; i < 4; i++) {
@@ -353,6 +354,6 @@ export class Hero {
 
   updateMana(value: number) {
     this.mana = value;
-    writeInt32(this.game.bytes, this.bytePosition + this.game.offsets.ManaPoints, value);
+    writeInt16(this.game.bytes, this.bytePosition + this.game.offsets.ManaPoints, value);
   }
 }

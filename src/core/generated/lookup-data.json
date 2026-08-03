@@ -257,6 +257,7 @@
     "WarMachines": {
       "namesByCode": {
         "3": "Catapult",
+        "4": "Ballista",
         "5": "Ammo Cart",
         "6": "First Aid Tent"
       },

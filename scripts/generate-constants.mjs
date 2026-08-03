@@ -15,6 +15,7 @@ function parseDictKey(key) {
   key = key.trim();
   if (key.startsWith('Empty')) return 0xff;
   if (key === 'BulwarkStartCode' || key.endsWith('.BulwarkStartCode')) return 186;
+  if (key === 'BALLISTA' || key.endsWith('.BALLISTA')) return 0x04;
   if (key.includes('.')) return NaN;
   if (key.startsWith('0x') || key.startsWith('0X')) return parseInt(key, 16);
   const num = Number(key);

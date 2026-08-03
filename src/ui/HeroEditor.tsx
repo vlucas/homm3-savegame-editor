@@ -76,10 +76,10 @@ export function HeroEditor({
       </div>
 
       <fieldset>
-        <legend>Creature stacks</legend>
-        <div className="stacks">
+        <legend>Army</legend>
+        <div className="army">
           {hero.creatures.map((cr, i) => (
-            <div className="stack" key={i}>
+            <div className="army-row" key={i}>
               <select
                 value={cr ?? ''}
                 onChange={(e) => { hero.updateCreature(i, e.target.value || null); refresh(); }}

@@ -206,6 +206,7 @@ Items.namesByCode.set(0x57, 'Tome of Air Magic');
 Items.namesByCode.set(0x58, 'Tome of Water Magic');
 Items.namesByCode.set(0x59, 'Tome of Earth Magic');
 export const WarMachines = cls('WarMachines');
+WarMachines.namesByCode.set(0x04, 'Ballista');
 export const Spells = cls('Spells');
 Spells.namesByCode.set(57, "Titan's Lightning Bolt");
 export const Creatures = cls('Creatures');

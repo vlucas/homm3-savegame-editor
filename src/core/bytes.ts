@@ -4,10 +4,21 @@ export function getInt(bytes: Uint8Array, start: number): number {
   return view.getInt16(start, true);
 }
 
+/** Read unsigned 16-bit little-endian integer (hero mana, etc.). */
+export function getUint16(bytes: Uint8Array, start: number): number {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return view.getUint16(start, true);
+}
+
 /** Read unsigned 32-bit little-endian integer (hero experience, etc.). */
 export function getUint32(bytes: Uint8Array, start: number): number {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return view.getUint32(start, true);
+}
+
+export function writeInt16(bytes: Uint8Array, start: number, value: number): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setInt16(start, value, true);
 }
 
 export function writeInt32(bytes: Uint8Array, start: number, value: number): void {

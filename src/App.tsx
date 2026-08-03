@@ -9,10 +9,6 @@ import './App.css';
 
 const ALL_PLAYERS = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
-function allPlayersSet(): Set<number> {
-  return new Set(ALL_PLAYERS);
-}
-
 function downloadBlob(data: Uint8Array, fileName: string) {
   const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
@@ -34,7 +30,7 @@ export default function App() {
   const [openHeroes, setOpenHeroes] = useState<Hero[]>([]);
   const [heroSelection, setHeroSelection] = useState('');
   const [lastSearchKey, setLastSearchKey] = useState('');
-  const [playerFilter, setPlayerFilter] = useState<Set<number>>(allPlayersSet);
+  const [playerFilter, setPlayerFilter] = useState<Set<number>>(() => new Set());
 
   const inventoryArtifactGroups = useMemo(
     () => (game ? getInventoryArtifactGroups() : []),
@@ -76,7 +72,7 @@ export default function App() {
       setOpenHeroes([]);
       setHeroSelection('');
       setLastSearchKey('');
-      setPlayerFilter(allPlayersSet());
+      setPlayerFilter(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open save');
       setGame(null);
@@ -91,33 +87,33 @@ export default function App() {
     if (file) openFile(file);
   }, [openFile]);
 
-  const searchHero = () => {
-    if (!game || !heroSelection) return;
-    const entry = allHeroes.find((h) => h.key === heroSelection);
+  const searchHero = (key: string) => {
+    if (!game || !key) return;
+    const entry = allHeroes.find((h) => h.key === key);
     if (!entry) {
       setMessage('Hero not found in save');
       return;
     }
 
-    const continuingDuplicates =
-      heroSelection === lastSearchKey && openHeroes.length > 0;
+    const continuingDuplicates = key === lastSearchKey && openHeroes.length > 0;
     if (!continuingDuplicates) {
       game.heroes = [];
       setOpenHeroes([]);
     }
 
     const ok = game.searchHero(entry.name, entry.player);
-    if (ok) setOpenHeroes([...game.heroes]);
-    setLastSearchKey(heroSelection);
-
-    const display = entry.player === NEUTRAL_PLAYER ? entry.name : entry.label;
-    setMessage(
-      ok
-        ? `Found hero: ${display}`
-        : game.heroes.some((h) => h.name === entry.name)
+    if (ok) {
+      setOpenHeroes([...game.heroes]);
+      setMessage(null);
+    } else {
+      const display = entry.player === NEUTRAL_PLAYER ? entry.name : entry.label;
+      setMessage(
+        game.heroes.some((h) => h.name === entry.name)
           ? `No further instances of ${display} found`
           : `Hero not found: ${display}`,
-    );
+      );
+    }
+    setLastSearchKey(key);
   };
 
   const saveGame = async () => {
@@ -146,6 +142,19 @@ export default function App() {
     setLastSearchKey('');
   };
 
+  const closeSave = () => {
+    if (!window.confirm('Close this save and discard unsaved changes?')) return;
+    setGame(null);
+    setMapHeroes([]);
+    setAllHeroes([]);
+    setOpenHeroes([]);
+    setHeroSelection('');
+    setLastSearchKey('');
+    setPlayerFilter(new Set());
+    setMessage(null);
+    setError(null);
+  };
+
   const togglePlayerFilter = (player: number) => {
     setPlayerFilter((prev) => {
       const next = new Set(prev);
@@ -155,12 +164,10 @@ export default function App() {
     });
   };
 
-  const filteredHeroes = useMemo(
-    () => allHeroes.filter(
-      (h) => h.player === NEUTRAL_PLAYER || playerFilter.has(h.player),
-    ),
-    [allHeroes, playerFilter],
-  );
+  const filteredHeroes = useMemo(() => {
+    if (playerFilter.size === 0) return allHeroes;
+    return allHeroes.filter((h) => playerFilter.has(h.player));
+  }, [allHeroes, playerFilter]);
 
   const heroGroups = groupPresentHeroes(filteredHeroes);
 
@@ -174,21 +181,22 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1>HoMM3 Savegame Editor</h1>
-        <p className="tagline">Client-side editor — your saves never leave the browser</p>
       </header>
 
-      <section
-        className="dropzone"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={onDrop}
-      >
-        <input
-          type="file"
-          accept=".cgm,.gm1,.gm2,*.*gm"
-          onChange={(e) => e.target.files?.[0] && openFile(e.target.files[0])}
-        />
-        <p>{loading ? 'Loading…' : 'Drop a .CGM / .GM1 save or click to browse'}</p>
-      </section>
+      {!game && (
+        <section
+          className="dropzone"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+        >
+          <input
+            type="file"
+            accept=".cgm,.gm1,.gm2,*.*gm"
+            onChange={(e) => e.target.files?.[0] && openFile(e.target.files[0])}
+          />
+          <p>{loading ? 'Loading…' : 'Drop a .CGM / .GM1 save or click to browse'}</p>
+        </section>
+      )}
 
       {error && <div className="banner error">{error}</div>}
       {message && <div className="banner info">{message}</div>}
@@ -213,6 +221,9 @@ export default function App() {
                 </select>
               </label>
               <button type="button" onClick={saveGame} disabled={loading}>Download edited save</button>
+              <button type="button" className="button-danger" onClick={closeSave}>
+                Close save
+              </button>
             </div>
           </section>
 
@@ -235,7 +246,11 @@ export default function App() {
                 <div className="row">
                   <select
                     value={heroSelection}
-                    onChange={(e) => setHeroSelection(e.target.value)}
+                    onChange={(e) => {
+                      const key = e.target.value;
+                      setHeroSelection(key);
+                      searchHero(key);
+                    }}
                     disabled={filteredHeroes.length === 0}
                   >
                     <option value="">
@@ -249,13 +264,19 @@ export default function App() {
                       </optgroup>
                     ))}
                   </select>
-                  <button type="button" onClick={searchHero} disabled={!heroSelection}>Search</button>
+                  <button
+                    type="button"
+                    onClick={() => searchHero(heroSelection)}
+                    disabled={!heroSelection}
+                  >
+                    Find next
+                  </button>
                 </div>
               </>
             ) : (
               <p className="hint">No heroes detected in this save.</p>
             )}
-            <p className="hint">Search the same name again to find duplicate instances.</p>
+            <p className="hint">Use Find next to open another instance of the selected hero.</p>
           </section>
 
           {openHeroes.map((hero, idx) => (
