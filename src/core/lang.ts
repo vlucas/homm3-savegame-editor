@@ -122,7 +122,7 @@ export async function loadLangData(lang: string): Promise<LangData | null> {
     return null;
   }
   try {
-    const resp = await fetch(`/lang/lang-data.${key}.json`);
+    const resp = await fetch(`${import.meta.env.BASE_URL}lang/lang-data.${key}.json`);
     if (!resp.ok) throw new Error('missing');
     const raw = JSON.parse(stripJsonComments(await resp.text())) as RawLangFile;
     const data = mapLang(raw);

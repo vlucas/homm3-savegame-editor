@@ -8,7 +8,7 @@ export interface Homm3GzipModule {
 
 let modulePromise: Promise<Homm3GzipModule> | null = null;
 
-export function loadGzipModule(wasmUrl = '/wasm/homm3-gzip.wasm'): Promise<Homm3GzipModule> {
+export function loadGzipModule(wasmUrl = `${import.meta.env.BASE_URL}wasm/homm3-gzip.wasm`): Promise<Homm3GzipModule> {
   if (!modulePromise) {
     modulePromise = (async () => {
       const resp = await fetch(wasmUrl);
