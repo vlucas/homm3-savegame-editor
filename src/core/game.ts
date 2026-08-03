@@ -6,6 +6,9 @@ import {
   HEADER_OFFSETS,
   HERO_LANG_MARKERS,
   HERO_OFFSETS,
+  HERO_SCAN_START,
+  NEUTRAL_PLAYER,
+  PLAYER_COLORS,
   Heroes,
   Items,
   Helms,
@@ -24,6 +27,7 @@ import {
   WeaponsCodes,
   loadAllArtifacts,
   loadHotaItems,
+  reloadHotaReferenceCodes,
   removeHotaReferenceCodes,
 } from './constants';
 import { heroNamePattern, indexOfPattern, startsWith } from './bytes';
@@ -36,6 +40,51 @@ export interface Town {
   faction: string;
   factionLang: string;
   position: number;
+}
+
+export interface PresentHero {
+  name: string;
+  player: number;
+  label: string;
+  key: string;
+}
+
+export function formatPlayerLabel(player: number): string {
+  if (player >= 0 && player <= 7) {
+    return `Player ${player + 1} (${PLAYER_COLORS[player]})`;
+  }
+  if (player === NEUTRAL_PLAYER) return 'Neutral';
+  return 'Unknown';
+}
+
+export function presentHeroKey(name: string, player: number): string {
+  return `${name}|${player}`;
+}
+
+export interface PresentHeroGroup {
+  label: string;
+  heroes: PresentHero[];
+}
+
+/** Owned heroes by player 1–8, then neutral/unclaimed — each group A→Z. */
+export function groupPresentHeroes(heroes: PresentHero[]): PresentHeroGroup[] {
+  const groups: PresentHeroGroup[] = [];
+  const cmp = (a: PresentHero, b: PresentHero) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
+  for (let player = 0; player <= 7; player++) {
+    const owned = heroes.filter((h) => h.player === player).sort(cmp);
+    if (owned.length > 0) {
+      groups.push({ label: formatPlayerLabel(player), heroes: owned });
+    }
+  }
+
+  const neutral = heroes.filter((h) => h.player === NEUTRAL_PLAYER).sort(cmp);
+  if (neutral.length > 0) {
+    groups.push({ label: 'Neutral or unclaimed', heroes: neutral });
+  }
+
+  return groups;
 }
 
 export class Game {
@@ -133,6 +182,7 @@ export class Game {
       Heroes.setLang();
       Towns.setLang();
       loadAllArtifacts();
+      if (this.isHOTA) reloadHotaReferenceCodes();
       return;
     }
     Skills.setLang(data.skills ?? null);
@@ -151,6 +201,10 @@ export class Game {
     WarMachines.setLang(data.warMachines ?? null);
     Heroes.setLang(data.heroes, data.hotaHeroes, data.uniqueHeroes, data.roeHDHeroes);
     Towns.setLang(data.towns, data.hotaTowns, data.factions, data.hotaFactions);
+    if (this.isHOTA) {
+      Towns.loadHotaLang();
+      reloadHotaReferenceCodes();
+    }
     loadAllArtifacts();
   }
 
@@ -163,13 +217,155 @@ export class Game {
     return indexOfPattern(this.bytes, pattern);
   }
 
-  searchHero(name: string): boolean {
-    const bytePosition = this.searchHeroExt(name);
-    if (bytePosition > 0) {
-      this.heroes.push(new Hero(name, this, bytePosition));
-      return true;
+  /** All byte offsets where `name` appears in the save (left-to-right). */
+  findHeroPositions(name: string): number[] {
+    const pattern = heroNamePattern(name, encodeWin1251);
+    const positions: number[] = [];
+    let from = 0;
+    while (from <= this.bytes.length - pattern.length) {
+      const idx = indexOfPattern(this.bytes.subarray(from), pattern);
+      if (idx === -1) break;
+      const pos = from + idx;
+      positions.push(pos);
+      from = pos + 1;
+    }
+    return positions;
+  }
+
+  /** Search backward from `startPosition` for the next hero name match. */
+  searchHeroFrom(name: string, startPosition: number): number {
+    const pattern = heroNamePattern(name, encodeWin1251);
+    for (let i = startPosition - pattern.length; i > 0; i--) {
+      let found = true;
+      for (let j = 0; j < pattern.length; j++) {
+        if (this.bytes[i + j] !== pattern[j]) {
+          found = false;
+          break;
+        }
+      }
+      if (found) return i;
+    }
+    return -1;
+  }
+
+  /** True when `bytePosition` looks like a full hero struct, not a name-table entry. */
+  isValidHeroAt(bytePosition: number): boolean {
+    if (bytePosition < HERO_SCAN_START) return false;
+    const o = this.heroOffsets;
+    const b = this.bytes;
+    const need = Math.min(o.Player, o.HeroLevel, o.NumOfSkills);
+    if (bytePosition + need < 0 || bytePosition + o.HeroLevel >= b.length) return false;
+
+    const level = b[bytePosition + o.HeroLevel];
+    if (level > 75) return false;
+
+    const numSkills = b[bytePosition + o.NumOfSkills];
+    if (numSkills > 28) return false;
+    if (
+      b[bytePosition + o.NumOfSkills + 1] !== 0
+      || b[bytePosition + o.NumOfSkills + 2] !== 0
+      || b[bytePosition + o.NumOfSkills + 3] !== 0
+    ) return false;
+
+    const player = b[bytePosition + o.Player];
+    if (player > 7 && player !== NEUTRAL_PLAYER) return false;
+
+    return true;
+  }
+
+  /** Hero is on the map under player control (excludes the 0xFF roster pool). */
+  isActiveHeroAt(bytePosition: number): boolean {
+    return this.isValidHeroAt(bytePosition) && this.getHeroPlayer(bytePosition) <= 7;
+  }
+
+  /** Neutral hero on the map (excludes default roster-pool templates). */
+  isNeutralHeroAt(bytePosition: number): boolean {
+    return this.isValidHeroAt(bytePosition)
+      && this.getHeroPlayer(bytePosition) === NEUTRAL_PLAYER
+      && !this.isRosterTemplateAt(bytePosition);
+  }
+
+  /** Default roster-pool copy shipped with every save (player 0xFF, level 1, no gear). */
+  isRosterTemplateAt(bytePosition: number): boolean {
+    if (!this.isValidHeroAt(bytePosition)) return false;
+    if (this.getHeroPlayer(bytePosition) !== NEUTRAL_PLAYER) return false;
+    const o = this.heroOffsets;
+    const b = this.bytes;
+    if (b[bytePosition + o.HeroLevel] !== 1) return false;
+    if (this.hasEquippedGear(bytePosition)) return false;
+    const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const mov = view.getUint32(bytePosition + o.MaxMovementPoints, true);
+    return mov >= 1500 && mov <= 1800;
+  }
+
+  isListedHeroAt(bytePosition: number): boolean {
+    return this.isActiveHeroAt(bytePosition) || this.isNeutralHeroAt(bytePosition);
+  }
+
+  private hasEquippedGear(bytePosition: number): boolean {
+    const o = this.heroOffsets;
+    const b = this.bytes;
+    for (const slot of ['Helm', 'Cloak', 'Neck', 'Weapon', 'Shield', 'Armor', 'Boots']) {
+      const code = b[bytePosition + o[slot]];
+      if (code !== 0xff && code !== 0) return true;
     }
     return false;
+  }
+
+  getHeroPlayer(bytePosition: number): number {
+    return this.bytes[bytePosition + this.heroOffsets.Player];
+  }
+
+  /** Heroes on the map (player-owned or neutral), excluding the roster pool. */
+  listPresentHeroes(candidates: readonly string[]): PresentHero[] {
+    return this.listHeroEntries(candidates, (p) => this.isListedHeroAt(p));
+  }
+
+  /** Every hero struct in the save, including roster-pool templates. */
+  listAllHeroesInSave(candidates: readonly string[]): PresentHero[] {
+    return this.listHeroEntries(candidates, (p) => this.isValidHeroAt(p));
+  }
+
+  private listHeroEntries(
+    candidates: readonly string[],
+    include: (bytePosition: number) => boolean,
+  ): PresentHero[] {
+    const seen = new Set<string>();
+    const entries: PresentHero[] = [];
+
+    for (const name of candidates) {
+      for (const pos of this.findHeroPositions(name)) {
+        if (!include(pos)) continue;
+        const player = this.getHeroPlayer(pos);
+        const key = presentHeroKey(name, player);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        entries.push({
+          name,
+          player,
+          key,
+          label: player === NEUTRAL_PLAYER
+            ? name
+            : `${name} (${formatPlayerLabel(player)})`,
+        });
+      }
+    }
+
+    return groupPresentHeroes(entries).flatMap((g) => g.heroes);
+  }
+
+  searchHero(name: string, player?: number): boolean {
+    const positions = this.findHeroPositions(name).filter((p) => {
+      if (!this.isValidHeroAt(p)) return false;
+      return player === undefined || this.getHeroPlayer(p) === player;
+    });
+    const opened = new Set(
+      this.heroes.filter((h) => h.name === name).map((h) => h.bytePosition),
+    );
+    const bytePosition = positions.find((p) => !opened.has(p));
+    if (bytePosition === undefined) return false;
+    this.heroes.push(new Hero(name, this, bytePosition));
+    return true;
   }
 
   validateData(): string[] {

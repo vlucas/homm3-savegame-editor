@@ -11,32 +11,43 @@ const root = path.join(__dirname, '..');
 const csPath = path.join(root, 'reference/Heroes3Editor/Models/Constants.cs');
 const cs = fs.readFileSync(csPath, 'utf8');
 
+function parseDictKey(key) {
+  key = key.trim();
+  if (key.startsWith('Empty')) return 0xff;
+  if (key === 'BulwarkStartCode' || key.endsWith('.BulwarkStartCode')) return 186;
+  if (key.includes('.')) return NaN;
+  if (key.startsWith('0x') || key.startsWith('0X')) return parseInt(key, 16);
+  const num = Number(key);
+  return Number.isNaN(num) ? NaN : num;
+}
+
 function parseDictEntries(block) {
   const entries = [];
   const re = /\{([^,]+),\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
   let m;
   while ((m = re.exec(block))) {
-    let key = m[1].trim();
-    if (key.startsWith('Empty')) key = '0xFF';
-    if (key.includes('.')) continue; // skip const refs in artifact info
-    const num = key.startsWith('0x') || key.startsWith('0X')
-      ? parseInt(key, 16)
-      : Number(key);
+    const num = parseDictKey(m[1]);
     if (Number.isNaN(num)) continue;
     entries.push([num, m[2]]);
   }
   return entries;
 }
 
-function extractClassBlock(className) {
-  const re = new RegExp(`public class ${className}[\\s\\S]*?NamesByCode = new Dictionary<byte, string>[\\s\\S]*?\\{([\\s\\S]*?)\\};`, 'm');
+function extractClassSection(className) {
+  const re = new RegExp(`public class ${className}\\b([\\s\\S]*?)(?=\\n    public class )`, 'm');
   const m = cs.match(re);
   return m ? m[1] : '';
 }
 
+function extractClassBlock(className) {
+  const section = extractClassSection(className);
+  const m = section.match(/NamesByCode = new Dictionary<byte, string>\s*\{([\s\S]*?)\};/);
+  return m ? m[1] : '';
+}
+
 function extractHotaBlock(className) {
-  const re = new RegExp(`public class ${className}[\\s\\S]*?HOTANamesByCode = new Dictionary<byte, string>[\\s\\S]*?\\{([\\s\\S]*?)\\};`, 'm');
-  const m = cs.match(re);
+  const section = extractClassSection(className);
+  const m = section.match(/HOTANamesByCode = new Dictionary<byte, string>\s*\{([\s\S]*?)\};/);
   return m ? m[1] : '';
 }
 
@@ -59,12 +70,21 @@ for (const cls of classes) {
   };
 }
 
+function extractStringArray(name) {
+  const re = new RegExp(`private static readonly string\\[\\] ${name} =\\s*\\[([\\s\\S]*?)\\];`, 'm');
+  const m = cs.match(re);
+  if (!m) return [];
+  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+}
+
 // Heroes list
 const heroesMatch = cs.match(/private static readonly List<string> _heroes =\s*\[([\s\S]*?)\];/);
 const heroes = [...heroesMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 
-const heroesHotaMatch = cs.match(/private static readonly List<string> _heroesHota =\s*\[([\s\S]*?)\];/);
-const heroesHota = heroesHotaMatch ? [...heroesHotaMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+const heroesHota = [
+  ...extractStringArray('_heroesHota'),
+  ...extractStringArray('_heroesHotaBulwark'),
+];
 
 // Exp levels
 const expMatch = cs.match(/public static Dictionary<byte, int> ExpLevels[\s\S]*?=\s*new\(\)\s*\{([\s\S]*?)\};/);

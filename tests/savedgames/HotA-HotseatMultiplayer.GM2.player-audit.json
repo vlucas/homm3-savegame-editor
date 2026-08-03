@@ -1,0 +1,42 @@
+{
+  "save": "HotA-HotseatMultiplayer.GM2",
+  "map": "Crescent Island (Allies)",
+  "version": "44.10 (Horn of the Abyss)",
+  "lang": "en",
+  "player1": {
+    "onMap": [
+      "Bertram",
+      "Celestine",
+      "Dessa",
+      "Dury",
+      "Melchior",
+      "Tancred"
+    ],
+    "allInSave": [
+      "Bertram",
+      "Celestine",
+      "Dessa",
+      "Dury",
+      "Melchior",
+      "Tancred"
+    ]
+  },
+  "player2": {
+    "onMap": [
+      "Andal",
+      "Cassiopeia",
+      "Elmore",
+      "Illor",
+      "Jeremy",
+      "Leena"
+    ],
+    "allInSave": [
+      "Andal",
+      "Cassiopeia",
+      "Elmore",
+      "Illor",
+      "Jeremy",
+      "Leena"
+    ]
+  }
+}

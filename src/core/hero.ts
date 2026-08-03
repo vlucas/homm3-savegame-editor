@@ -12,7 +12,7 @@ import {
   WarMachines,
   type GearSlot,
 } from './constants';
-import { getInt, writeInt32 } from './bytes';
+import { getInt, getUint32, writeInt32 } from './bytes';
 
 export class Hero {
   readonly name: string;
@@ -51,7 +51,7 @@ export class Hero {
 
     this.level = b[bytePosition + o.HeroLevel];
     this.mana = b[bytePosition + o.ManaPoints];
-    this.experience = getInt(b, bytePosition + o.Experience);
+    this.experience = getUint32(b, bytePosition + o.Experience);
 
     for (let i = 0; i < 4; i++) {
       this.attributes[i] = b[bytePosition + o.Attributes + i] << 24 >> 24;
@@ -71,6 +71,8 @@ export class Hero {
       if (b[bytePosition + o.Spells + i] === 1) this.spells.add(Spells.getByCode(i));
       if (b[bytePosition + o.SpellBook + i] === 1) this.spellBook.add(Spells.getByCode(i));
     }
+    for (const spell of this.spells) this.spellBook.add(spell);
+    for (const spell of this.spellBook) this.spells.add(spell);
 
     for (let i = 0; i < 7; i++) {
       const code = b[bytePosition + o.Creatures + i * 4];
@@ -158,25 +160,30 @@ export class Hero {
     this.game.bytes[this.bytePosition + this.game.offsets.Skills + Skills.getCode(skill)] = level;
   }
 
+  private setSpellKnown(spell: string, known: boolean) {
+    const code = Spells.getCode(spell);
+    const pos = this.bytePosition;
+    const o = this.game.offsets;
+    const flag = known ? 1 : 0;
+    this.game.bytes[pos + o.Spells + code] = flag;
+    this.game.bytes[pos + o.SpellBook + code] = flag;
+    if (known) {
+      this.spells.add(spell);
+      this.spellBook.add(spell);
+    } else {
+      this.spells.delete(spell);
+      this.spellBook.delete(spell);
+    }
+  }
+
   addSpellToSpellBook(spell: string) {
-    if (!this.spellBook.add(spell)) return;
-    const pos = this.bytePosition + this.game.offsets.SpellBook + Spells.getCode(spell);
-    this.game.bytes[pos] = 1;
-  }
-
-  addSpellToSpells(spell: string) {
-    if (!this.spells.add(spell)) return;
-    this.game.bytes[this.bytePosition + this.game.offsets.Spells + Spells.getCode(spell)] = 1;
-  }
-
-  removeSpellFromSpells(spell: string) {
-    if (!this.spells.delete(spell)) return;
-    this.game.bytes[this.bytePosition + this.game.offsets.Spells + Spells.getCode(spell)] = 0;
+    if (this.spellBook.has(spell)) return;
+    this.setSpellKnown(spell, true);
   }
 
   removeSpellFromSpellBook(spell: string) {
-    if (!this.spellBook.delete(spell)) return;
-    this.game.bytes[this.bytePosition + this.game.offsets.SpellBook + Spells.getCode(spell)] = 0;
+    if (!this.spellBook.has(spell)) return;
+    this.setSpellKnown(spell, false);
   }
 
   toggleSpellBook(enable: boolean) {

@@ -64,7 +64,18 @@ export const HERO_OFFSETS: Record<string, number> = {
   CoordinatesX: -195,
   CoordinatesY: -193,
   CoordinatesZ: -191,
+  Player: -169,
 };
+
+/** First byte offset to scan for on-map hero structs (skip roster/name tables). */
+export const HERO_SCAN_START = 30000;
+
+export const NEUTRAL_PLAYER = 0xff;
+
+/** Standard HoMM3 player slot colors (players 1–8). */
+export const PLAYER_COLORS = [
+  'Red', 'Blue', 'Tan', 'Green', 'Orange', 'Purple', 'Teal', 'Pink',
+] as const;
 
 export const HEADER_OFFSETS: Record<string, number> = { MapName: 0x3a };
 
@@ -189,6 +200,11 @@ export const Boots = cls('Boots');
 export const Neck = cls('Neck');
 export const Rings = cls('Rings');
 export const Items = cls('Items');
+Items.namesByCode.set(0x01, 'Spell Scroll');
+Items.namesByCode.set(0x56, 'Tome of Fire Magic');
+Items.namesByCode.set(0x57, 'Tome of Air Magic');
+Items.namesByCode.set(0x58, 'Tome of Water Magic');
+Items.namesByCode.set(0x59, 'Tome of Earth Magic');
 export const WarMachines = cls('WarMachines');
 export const Spells = cls('Spells');
 Spells.namesByCode.set(57, "Titan's Lightning Bolt");
@@ -294,6 +310,8 @@ export class TownsRegistry {
   langHota: Map<string, string> | null = null;
   langFactions: Map<string, string> | null = null;
   langFactionsHota: Map<string, string> | null = null;
+  private langSaved = new Map<string, string>();
+  private langFactionsSaved = new Map<string, string>();
 
   get factions(): string[] {
     return Object.keys(this.towns);
@@ -309,10 +327,54 @@ export class TownsRegistry {
     factions?: Record<string, string>,
     factionsHota?: Record<string, string>,
   ) {
+    this.langSaved.clear();
+    this.langFactionsSaved.clear();
     this.lang = lang ? new Map(Object.entries(lang)) : null;
     this.langHota = hota ? new Map(Object.entries(hota)) : null;
     this.langFactions = factions ? new Map(Object.entries(factions)) : null;
     this.langFactionsHota = factionsHota ? new Map(Object.entries(factionsHota)) : null;
+  }
+
+  loadHotaLang() {
+    if (this.lang && this.langHota) {
+      this.langSaved.clear();
+      for (const [key, value] of this.langHota) {
+        if (this.lang.has(key)) {
+          const prev = this.lang.get(key)!;
+          if (prev !== value) {
+            this.langSaved.set(key, prev);
+            this.lang.set(key, value);
+          }
+        } else {
+          this.lang.set(key, value);
+        }
+      }
+    }
+    if (this.langFactions && this.langFactionsHota) {
+      this.langFactionsSaved.clear();
+      for (const [key, value] of this.langFactionsHota) {
+        if (this.langFactions.has(key)) {
+          const prev = this.langFactions.get(key)!;
+          if (prev !== value) {
+            this.langFactionsSaved.set(key, prev);
+            this.langFactions.set(key, value);
+          }
+        } else {
+          this.langFactions.set(key, value);
+        }
+      }
+    }
+  }
+
+  removeHotaLang() {
+    if (this.lang) {
+      for (const [key, value] of this.langSaved) this.lang.set(key, value);
+      this.langSaved.clear();
+    }
+    if (this.langFactions) {
+      for (const [key, value] of this.langFactionsSaved) this.langFactions.set(key, value);
+      this.langFactionsSaved.clear();
+    }
   }
 
   loadHotaValues(withBulwark = true) {
@@ -339,6 +401,18 @@ export class TownsRegistry {
 export const Towns = new TownsRegistry();
 
 export function loadHotaItems(withBulwark = true) {
+  reloadHotaReferenceCodes();
+  Heroes.loadHotaValues(withBulwark);
+  Towns.loadHotaValues(withBulwark);
+  if (!withBulwark) {
+    Skills.removeByKey(SkillsCodes.RunesKey);
+    for (let code = CreaturesCodes.BulwarkStartCode; code < CreaturesCodes.BulwarkStartCode + 14; code++) {
+      Creatures.removeByKey(code);
+    }
+  }
+}
+
+export function reloadHotaReferenceCodes() {
   WarMachines.loadHotaReferenceCodes();
   Weapons.loadHotaReferenceCodes();
   Shields.loadHotaReferenceCodes();
@@ -351,14 +425,6 @@ export function loadHotaItems(withBulwark = true) {
   Items.loadHotaReferenceCodes();
   Creatures.loadHotaReferenceCodes();
   Skills.loadHotaReferenceCodes();
-  Heroes.loadHotaValues(withBulwark);
-  Towns.loadHotaValues(withBulwark);
-  if (!withBulwark) {
-    Skills.removeByKey(SkillsCodes.RunesKey);
-    for (let code = CreaturesCodes.BulwarkStartCode; code < CreaturesCodes.BulwarkStartCode + 14; code++) {
-      Creatures.removeByKey(code);
-    }
-  }
 }
 
 export function removeHotaReferenceCodes() {
@@ -384,3 +450,140 @@ export const GEAR_SLOTS = [
 ] as const;
 
 export type GearSlot = (typeof GEAR_SLOTS)[number];
+
+export interface ArtifactGroup {
+  label: string;
+  artifacts: string[];
+}
+
+const GEAR_SLOT_ARTIFACT_SOURCES: Record<GearSlot, BaseProp> = {
+  Helm: Helms,
+  Neck: Neck,
+  Armor: Armor,
+  Cloak: Cloak,
+  Boots: Boots,
+  Weapon: Weapons,
+  Shield: Shields,
+  LeftRing: Rings,
+  RightRing: Rings,
+  Item1: Items,
+  Item2: Items,
+  Item3: Items,
+  Item4: Items,
+  Item5: Items,
+};
+
+const INVENTORY_ARTIFACT_GROUP_SOURCES: { label: string; source: BaseProp }[] = [
+  { label: 'Helms', source: Helms },
+  { label: 'Neck', source: Neck },
+  { label: 'Armor', source: Armor },
+  { label: 'Cloak', source: Cloak },
+  { label: 'Boots', source: Boots },
+  { label: 'Weapons', source: Weapons },
+  { label: 'Shields', source: Shields },
+  { label: 'Rings', source: Rings },
+  { label: 'Miscellaneous', source: Items },
+];
+
+export function sortArtifactNames(names: string[]): string[] {
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+export function artifactNamesForSource(source: BaseProp): string[] {
+  return sortArtifactNames(source.names.filter((name) => name !== '-'));
+}
+
+export function getArtifactsForGearSlot(slot: GearSlot): string[] {
+  return artifactNamesForSource(GEAR_SLOT_ARTIFACT_SOURCES[slot]);
+}
+
+export function getGearSlotArtifactLists(): Record<GearSlot, string[]> {
+  return Object.fromEntries(
+    GEAR_SLOTS.map((slot) => [slot, getArtifactsForGearSlot(slot)]),
+  ) as Record<GearSlot, string[]>;
+}
+
+/** Slot options for a gear dropdown, keeping an out-of-slot equipped value visible. */
+export function gearSlotArtifactOptions(slot: GearSlot, equipped: string): string[] {
+  const allowed = getArtifactsForGearSlot(slot);
+  if (equipped !== '-' && !allowed.includes(equipped)) {
+    return sortArtifactNames([...allowed, equipped]);
+  }
+  return allowed;
+}
+
+export function getInventoryArtifactGroups(): ArtifactGroup[] {
+  const groups = INVENTORY_ARTIFACT_GROUP_SOURCES.map(({ label, source }) => ({
+    label,
+    artifacts: artifactNamesForSource(source),
+  }));
+  const grail = Artifacts.getByCode(0x02);
+  if (grail !== '-') {
+    groups.push({ label: 'Special', artifacts: sortArtifactNames([grail]) });
+  }
+  return groups.filter((group) => group.artifacts.length > 0);
+}
+
+export interface CreatureGroup {
+  label: string;
+  creatures: string[];
+}
+
+const CREATURE_FACTION_DEFS: { faction: string; codes: number[]; hotaOnly?: boolean }[] = [
+  { faction: 'Castle', codes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] },
+  { faction: 'Rampart', codes: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] },
+  { faction: 'Tower', codes: [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41] },
+  { faction: 'Inferno', codes: [42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55] },
+  { faction: 'Necropolis', codes: [56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69] },
+  { faction: 'Dungeon', codes: [70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83] },
+  { faction: 'Stronghold', codes: [84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97] },
+  { faction: 'Fortress', codes: [98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111] },
+  { faction: 'Conflux', codes: [112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 123, 125, 127, 129, 130, 131] },
+  { faction: 'Cove', codes: [153, 154, 155, 156, 157, 158, 151, 159, 160, 161, 162, 163, 164, 165, 166], hotaOnly: true },
+  { faction: 'Factory', codes: [171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185], hotaOnly: true },
+  { faction: 'Bulwark', codes: [186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199], hotaOnly: true },
+];
+
+const CLASSIC_NEUTRAL_CREATURE_CODES = [132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144];
+const HOTA_NEUTRAL_CREATURE_CODES = [167, 168, 169, 170];
+
+function creatureNamesForCodes(codes: number[]): string[] {
+  return codes
+    .filter((code) => Creatures.namesByCode.has(code))
+    .map((code) => Creatures.getByCode(code));
+}
+
+export function getCreatureGroups(options: { isHota: boolean; withBulwark: boolean }): CreatureGroup[] {
+  const groups: CreatureGroup[] = [];
+  for (const def of CREATURE_FACTION_DEFS) {
+    if (def.hotaOnly && !options.isHota) continue;
+    if (def.faction === 'Bulwark' && options.isHota && !options.withBulwark) continue;
+    const creatures = creatureNamesForCodes(def.codes);
+    if (creatures.length > 0) {
+      groups.push({
+        label: Towns.getLangFactionValue(def.faction),
+        creatures,
+      });
+    }
+  }
+  const neutralCodes = [
+    ...CLASSIC_NEUTRAL_CREATURE_CODES,
+    ...(options.isHota ? HOTA_NEUTRAL_CREATURE_CODES : []),
+  ];
+  const neutrals = sortArtifactNames(creatureNamesForCodes(neutralCodes));
+  if (neutrals.length > 0) {
+    groups.push({ label: 'Neutral', creatures: neutrals });
+  }
+  return groups;
+}
+
+/** Keep an equipped stack visible even when its type is outside normal faction lists. */
+export function creatureStackGroups(
+  current: string | null,
+  groups: CreatureGroup[],
+): CreatureGroup[] {
+  if (!current) return groups;
+  const known = new Set(groups.flatMap((g) => g.creatures));
+  if (known.has(current)) return groups;
+  return [...groups, { label: 'Other', creatures: [current] }];
+}

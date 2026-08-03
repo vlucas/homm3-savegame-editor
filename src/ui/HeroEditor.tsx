@@ -1,18 +1,26 @@
 import { useState } from 'react';
 import type { Hero } from '../core/hero';
-import { GEAR_SLOTS } from '../core/constants';
+import { GEAR_SLOTS, gearSlotArtifactOptions, creatureStackGroups, type ArtifactGroup, type CreatureGroup } from '../core/constants';
 
 interface Props {
   hero: Hero;
   skills: string[];
   skillLevels: string[];
   spells: string[];
-  creatures: string[];
-  artifacts: string[];
+  creatureGroups: CreatureGroup[];
+  inventoryArtifactGroups: ArtifactGroup[];
   warMachines: string[];
 }
 
-export function HeroEditor({ hero, skills, skillLevels, spells, creatures, artifacts, warMachines }: Props) {
+export function HeroEditor({
+  hero,
+  skills,
+  skillLevels,
+  spells,
+  creatureGroups,
+  inventoryArtifactGroups,
+  warMachines,
+}: Props) {
   const [, tick] = useState(0);
   const refresh = () => tick((n) => n + 1);
 
@@ -77,7 +85,11 @@ export function HeroEditor({ hero, skills, skillLevels, spells, creatures, artif
                 onChange={(e) => { hero.updateCreature(i, e.target.value || null); refresh(); }}
               >
                 <option value="">— empty —</option>
-                {creatures.map((c) => <option key={c} value={c}>{c}</option>)}
+                {creatureStackGroups(cr, creatureGroups).map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.creatures.map((c) => <option key={`${group.label}-${c}`} value={c}>{c}</option>)}
+                  </optgroup>
+                ))}
               </select>
               <input
                 type="number"
@@ -125,7 +137,9 @@ export function HeroEditor({ hero, skills, skillLevels, spells, creatures, artif
                 }}
               >
                 <option value="-">—</option>
-                {artifacts.map((a) => <option key={a} value={a}>{a}</option>)}
+                {gearSlotArtifactOptions(slot, hero.equippedArtifacts[slot]).map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
               </select>
               {slot.startsWith('Item') && hero.equippedArtifacts[slot] === 'Spell Scroll' && (
                 <select
@@ -138,26 +152,6 @@ export function HeroEditor({ hero, skills, skillLevels, spells, creatures, artif
                   {spells.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Spells (known)</legend>
-        <div className="spell-grid">
-          {spells.map((sp) => (
-            <label key={sp} className="check">
-              <input
-                type="checkbox"
-                checked={hero.spells.has(sp)}
-                onChange={(e) => {
-                  if (e.target.checked) hero.addSpellToSpells(sp);
-                  else hero.removeSpellFromSpells(sp);
-                  refresh();
-                }}
-              />
-              {sp}
             </label>
           ))}
         </div>
@@ -188,7 +182,11 @@ export function HeroEditor({ hero, skills, skillLevels, spells, creatures, artif
         <div className="row">
           <select id={`inv-add-${hero.bytePosition}`} defaultValue="">
             <option value="">Add artifact…</option>
-            {artifacts.map((a) => <option key={a} value={a}>{a}</option>)}
+            {inventoryArtifactGroups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.artifacts.map((a) => <option key={`${group.label}-${a}`} value={a}>{a}</option>)}
+              </optgroup>
+            ))}
           </select>
           <button
             type="button"
