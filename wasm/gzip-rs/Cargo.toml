@@ -1,0 +1,11 @@
+[package]
+name = "homm3-gzip"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libflate = "2.1"
+crc32fast = "1.4"

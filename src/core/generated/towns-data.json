@@ -1,0 +1,18 @@
+{
+  "towns": {
+    "Castle": ["Castellatus", "Cornerstone", "Claxton", "Armitage", "Whistledale", "Gateway", "Dunwall", "Kildare", "Kanan", "Highcastle", "Whitemoon", "Transom", "Middleheim", "Brettonia", "Alexandretta", "Whitestone"],
+    "Conflux": ["Elementon", "Styriam", "Ventu", "Fleogan Mills", "Electrising", "Ceald", "Igne", "Froisan", "Fenderen", "Lagumoor", "Wazzar", "Lanting", "Vluchton", "Solium", "Massein", "Magmetin"],
+    "Dungeon": ["Veks", "Sorrow Crown", "Dragonnade", "Shade", "Evernight", "Darkburrow", "Lost Hold", "Coldshadow", "Chillwater", "Deepshadow", "Darkhold", "Blindroot", "Shadowden", "Scar", "Malev", "Castigare"],
+    "Fortress": ["Marshank", "Deadfall", "Drakenmoor", "Hermit Cove", "Mosswood", "Marshwall", "Mossden", "Mudshire", "Coolmire", "Backwater", "Marshchoke", "Lostmoor", "Silt", "Deadwood", "Edgewater", "Stillbog"],
+    "Inferno": ["Abaddon", "Acheron", "Ashcombe", "Hellwind", "Stygius", "Styx", "Tartaros", "Blackburn", "Ashden", "Brimstone", "Candent", "Cinderspire", "Daemon Gate", "Enkindle", "Gehenna", "Firebrand"],
+    "Necropolis": ["Haunt's Wind", "Cessacioun", "Coldreign", "Dark Eternal", "Ghostwind", "Blight", "Shadow Keep", "Worm Warren", "Agony", "Sanctum", "Terminus", "Blackquarter", "Death's Gate", "Grave Raven", "Dark Cloud", "Coldsoul"],
+    "Rampart": ["Wise Oak", "Forest", "Strongglen", "Marishen", "Bath'iere", "Green Falls", "Emerald Moor", "Wild Willow", "Fortune Keep", "Still Water", "Elfwind", "Serenity", "Ceiliedgh", "Gladeroot", "Forest Glen", "Rainhaven"],
+    "Stronghold": ["Kragg", "Drago Breach", "Tormina", "Dolere", "Rockwarren", "Strongglen", "Kruber", "Rovener", "Hartgrim", "Sandflash", "Morganheim", "Cragmoor", "Dragonspire", "Battlement", "Bocc", "Slau"],
+    "Tower": ["Machina", "Stronggale", "Tirith", "Fallen Star", "Mystos", "Ayer", "Silverspire", "Manufactury", "Corona", "Silverwing", "Facture", "Cloudfire", "Cloudspire", "Equinox", "Athenaeum", "Valtara"]
+  },
+  "hotaTowns": {
+    "Cove": ["Tartaglia", "Lewindale", "Westland Pier", "Walendale", "Port Crowland", "Jordanhall", "Sleepy Creek", "Hitchgrove", "Port Evendore", "Rotunda", "Watergate", "Brown's Bay", "Nithenes", "Downhaven", "Lakenshire", "Noral"],
+    "Factory": ["Salda", "Burton", "Prospero", "Mount Copper", "Ardon", "New Dolere", "Corakstone", "Kergar", "Dardentor", "Arcadia", "Endurance", "Vulcan", "Aurichalcum", "Fort Rotwang", "Volta", "Ridder"],
+    "Bulwark": ["Ellesmere", "Anabar", "Tundara", "White Mouth", "Varand", "Alfheim", "Meghion", "Thulekh", "Everwinter", "Borea", "Stonefang", "Winterkill", "Windskalir", "Ketpall", "Jotunngard", "Halsmere"]
+  }
+}
