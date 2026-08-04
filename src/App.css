@@ -200,6 +200,57 @@ body {
   gap: 1rem;
 }
 
+.primary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.85rem;
+  align-items: end;
+}
+
+.primary-stats > label {
+  margin-bottom: 0;
+  flex: 1 1 5.5rem;
+  min-width: 4.5rem;
+}
+
+.primary-stats > label:not(.check) input {
+  width: 100%;
+  min-width: 0;
+}
+
+.primary-stats > label.primary-spellbook {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  padding-bottom: 0.45rem;
+  white-space: nowrap;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 1rem;
+}
+
+.skills-grid .row {
+  min-width: 0;
+}
+
+.skills-grid .row select:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.skills-grid .row select:last-child {
+  flex: 0 0 7.5rem;
+}
+
+@media (max-width: 640px) {
+  .skills-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* —— Fieldsets (parchment inset) —— */
 fieldset {
   border: 1px solid var(--gold-dim);
@@ -350,6 +401,13 @@ button.button-danger:hover:not(:disabled) {
   color: var(--muted);
   font-size: 0.88rem;
   margin: 0.65rem 0 0;
+}
+
+.heroes-loading {
+  margin: 0.35rem 0 0;
+  color: var(--gold);
+  font-family: Cinzel, serif;
+  letter-spacing: 0.04em;
 }
 
 .meta {

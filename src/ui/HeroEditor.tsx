@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import type { Hero } from '../core/hero';
-import { GEAR_SLOTS, gearSlotArtifactOptions, creatureStackGroups, type ArtifactGroup, type CreatureGroup } from '../core/constants';
+import {
+  GEAR_SLOTS,
+  gearSlotArtifactOptions,
+  creatureStackGroups,
+  experienceForLevel,
+  levelForExperience,
+  MAX_HERO_LEVEL,
+  MIN_HERO_LEVEL,
+  type ArtifactGroup,
+  type CreatureGroup,
+} from '../core/constants';
 
 interface Props {
   hero: Hero;
@@ -28,9 +38,9 @@ export function HeroEditor({
     <section className="panel hero-editor">
       <h2>{hero.name} <span className="meta">@ 0x{hero.bytePosition.toString(16)}</span></h2>
 
-      <div className="grid-2">
-        <fieldset>
-          <legend>Primary</legend>
+      <fieldset>
+        <legend>Primary</legend>
+        <div className="primary-stats">
           {['Attack', 'Defense', 'Spell Power', 'Knowledge'].map((label, i) => (
             <label key={label}>
               {label}
@@ -43,17 +53,49 @@ export function HeroEditor({
               />
             </label>
           ))}
-          <label>Level <input type="number" min={1} max={255} value={hero.level} onChange={(e) => { hero.updateLevel(Number(e.target.value)); refresh(); }} /></label>
-          <label>Experience <input type="number" min={0} value={hero.experience} onChange={(e) => { hero.updateExperience(Number(e.target.value)); refresh(); }} /></label>
-          <label>Mana <input type="number" min={0} value={hero.mana} onChange={(e) => { hero.updateMana(Number(e.target.value)); refresh(); }} /></label>
           <label>
-            <input type="checkbox" checked={hero.spellBookExist} onChange={(e) => { hero.toggleSpellBook(e.target.checked); refresh(); }} />
-            Spellbook equipped
+            Level
+            <input
+              type="number"
+              min={MIN_HERO_LEVEL}
+              max={MAX_HERO_LEVEL}
+              value={hero.level}
+              onChange={(e) => {
+                const level = Math.min(MAX_HERO_LEVEL, Math.max(MIN_HERO_LEVEL, Number(e.target.value) || MIN_HERO_LEVEL));
+                hero.updateLevel(level);
+                hero.updateExperience(experienceForLevel(level));
+                refresh();
+              }}
+            />
           </label>
-        </fieldset>
+          <label>
+            Exp (lvl {hero.level})
+            <input
+              type="number"
+              min={0}
+              value={hero.experience}
+              onChange={(e) => {
+                const xp = Math.max(0, Number(e.target.value) || 0);
+                hero.updateExperience(xp);
+                hero.updateLevel(levelForExperience(xp));
+                refresh();
+              }}
+            />
+          </label>
+          <label>
+            Mana
+            <input type="number" min={0} value={hero.mana} onChange={(e) => { hero.updateMana(Number(e.target.value)); refresh(); }} />
+          </label>
+          <label className="check primary-spellbook">
+            <input type="checkbox" checked={hero.spellBookExist} onChange={(e) => { hero.toggleSpellBook(e.target.checked); refresh(); }} />
+            Spellbook
+          </label>
+        </div>
+      </fieldset>
 
-        <fieldset>
-          <legend>Secondary skills</legend>
+      <fieldset>
+        <legend>Secondary skills</legend>
+        <div className="skills-grid">
           {hero.skills.map((skill, slot) => (
             <div className="row" key={slot}>
               <select
@@ -72,8 +114,8 @@ export function HeroEditor({
               </select>
             </div>
           ))}
-        </fieldset>
-      </div>
+        </div>
+      </fieldset>
 
       <fieldset>
         <legend>Army</legend>

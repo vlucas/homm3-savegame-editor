@@ -31,6 +31,7 @@ export default function App() {
   const [heroSelection, setHeroSelection] = useState('');
   const [lastSearchKey, setLastSearchKey] = useState('');
   const [playerFilter, setPlayerFilter] = useState<Set<number>>(() => new Set());
+  const [heroesLoading, setHeroesLoading] = useState(false);
 
   const inventoryArtifactGroups = useMemo(
     () => (game ? getInventoryArtifactGroups() : []),
@@ -47,17 +48,28 @@ export default function App() {
     [game, uiLang],
   );
 
-  const refreshHeroLists = useCallback((g: Game) => {
-    const onMap = g.listPresentHeroes(Heroes.names);
-    const all = g.listAllHeroesInSave(Heroes.names);
-    setMapHeroes(onMap);
-    setAllHeroes(all);
-    setCachedHeroes(g, onMap);
-    return { onMap, all };
+  const refreshHeroLists = useCallback(async (g: Game) => {
+    setHeroesLoading(true);
+    setMapHeroes([]);
+    setAllHeroes([]);
+    // Yield so React can paint the loading message before the scan blocks.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    try {
+      const onMap = g.listPresentHeroes(Heroes.names);
+      const all = g.listAllHeroesInSave(Heroes.names);
+      setMapHeroes(onMap);
+      setAllHeroes(all);
+      setCachedHeroes(g, onMap);
+    } finally {
+      setHeroesLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (game) refreshHeroLists(game);
+    if (!game) return;
+    void refreshHeroLists(game);
   }, [game, uiLang, refreshHeroLists]);
 
   const openFile = useCallback(async (file: File) => {
@@ -151,6 +163,7 @@ export default function App() {
     setHeroSelection('');
     setLastSearchKey('');
     setPlayerFilter(new Set());
+    setHeroesLoading(false);
     setMessage(null);
     setError(null);
   };
@@ -229,7 +242,11 @@ export default function App() {
 
           <section className="panel hero-search">
             <h2>Find Hero</h2>
-            {allHeroes.length > 0 ? (
+            {heroesLoading ? (
+              <p className="hint heroes-loading" aria-live="polite">
+                Scanning save for heroes…
+              </p>
+            ) : allHeroes.length > 0 ? (
               <>
                 <div className="player-filter row" role="group" aria-label="Filter by player">
                   {ALL_PLAYERS.map((player) => (
@@ -272,11 +289,11 @@ export default function App() {
                     Find next
                   </button>
                 </div>
+                <p className="hint">Use Find next to open another instance of the selected hero.</p>
               </>
             ) : (
               <p className="hint">No heroes detected in this save.</p>
             )}
-            <p className="hint">Use Find next to open another instance of the selected hero.</p>
           </section>
 
           {openHeroes.map((hero, idx) => (

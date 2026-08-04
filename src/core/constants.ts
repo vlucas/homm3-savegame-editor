@@ -79,7 +79,34 @@ export const PLAYER_COLORS = [
 
 export const HEADER_OFFSETS: Record<string, number> = { MapName: 0x3a };
 
-export const EXP_LEVELS: Record<number, number> = lookupData.expLevels as Record<string, number>;
+/** Minimum experience required for each hero level (HoMM3 lookup table, levels 1–75). */
+export const EXP_LEVELS: Record<number, number> = Object.fromEntries(
+  Object.entries(lookupData.expLevels as Record<string, number>).map(([level, xp]) => [Number(level), xp]),
+);
+
+const EXP_LEVEL_ENTRIES = Object.entries(EXP_LEVELS)
+  .map(([level, xp]) => [Number(level), xp] as const)
+  .sort((a, b) => a[0] - b[0]);
+
+export const MIN_HERO_LEVEL = EXP_LEVEL_ENTRIES[0]?.[0] ?? 1;
+export const MAX_HERO_LEVEL = EXP_LEVEL_ENTRIES[EXP_LEVEL_ENTRIES.length - 1]?.[0] ?? 75;
+
+/** Experience threshold for a level (clamped to the known 1–75 table). */
+export function experienceForLevel(level: number): number {
+  const clamped = Math.min(MAX_HERO_LEVEL, Math.max(MIN_HERO_LEVEL, Math.floor(level) || MIN_HERO_LEVEL));
+  return EXP_LEVELS[clamped] ?? 0;
+}
+
+/** Highest level whose XP threshold is <= experience. */
+export function levelForExperience(experience: number): number {
+  const xp = Math.max(0, Math.floor(experience) || 0);
+  let level = MIN_HERO_LEVEL;
+  for (const [lvl, threshold] of EXP_LEVEL_ENTRIES) {
+    if (xp >= threshold) level = lvl;
+    else break;
+  }
+  return level;
+}
 
 export const LANG_CODES = ['EN', 'RU', 'PL', 'FR'] as const;
 

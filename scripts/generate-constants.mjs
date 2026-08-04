@@ -34,6 +34,17 @@ function parseDictEntries(block) {
   return entries;
 }
 
+/** Parse `{ level, xp }` int dictionaries such as ExpLevels. */
+function parseIntDictEntries(block) {
+  const entries = [];
+  const re = /\{\s*(\d+)\s*,\s*(-?\d+)\s*\}/g;
+  let m;
+  while ((m = re.exec(block))) {
+    entries.push([Number(m[1]), Number(m[2])]);
+  }
+  return entries;
+}
+
 function extractClassSection(className) {
   const re = new RegExp(`public class ${className}\\b([\\s\\S]*?)(?=\\n    public class )`, 'm');
   const m = cs.match(re);
@@ -87,9 +98,9 @@ const heroesHota = [
   ...extractStringArray('_heroesHotaBulwark'),
 ];
 
-// Exp levels
+// Exp levels (level -> minimum experience)
 const expMatch = cs.match(/public static Dictionary<byte, int> ExpLevels[\s\S]*?=\s*new\(\)\s*\{([\s\S]*?)\};/);
-const expLevels = toRecord(parseDictEntries(expMatch[1]));
+const expLevels = toRecord(parseIntDictEntries(expMatch?.[1] ?? ''));
 
 // ItemSpells - simplified extraction
 const itemSpellsBlock = cs.match(/public static readonly Dictionary<int, string\[\]> ItemSpells = new\(\)\s*\{([\s\S]*?)\};\s*\n\s*public const byte TitansLightningBolt/s)?.[1] ?? '';

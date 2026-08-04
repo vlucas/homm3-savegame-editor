@@ -76,6 +76,20 @@ describe('constants', () => {
     expect(groups.find((g) => g.label === 'Special')?.artifacts).toEqual(['Grail']);
   });
 
+  it('maps hero experience to levels using the HoMM3 table', async () => {
+    const { experienceForLevel, levelForExperience, EXP_LEVELS } = await import('../src/core/constants');
+    expect(Object.keys(EXP_LEVELS).length).toBe(75);
+    expect(experienceForLevel(1)).toBe(0);
+    expect(experienceForLevel(18)).toBe(57533);
+    expect(levelForExperience(0)).toBe(1);
+    expect(levelForExperience(999)).toBe(1);
+    expect(levelForExperience(1000)).toBe(2);
+    expect(levelForExperience(62506)).toBe(18);
+    expect(levelForExperience(57532)).toBe(17);
+    expect(levelForExperience(57533)).toBe(18);
+    expect(levelForExperience(experienceForLevel(40))).toBe(40);
+  });
+
   it('groups creatures by faction in level order with alphabetized neutrals', async () => {
     const { getCreatureGroups, Creatures, loadHotaItems } = await import('../src/core/constants');
     loadAllArtifacts();
