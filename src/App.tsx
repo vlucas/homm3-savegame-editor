@@ -193,22 +193,57 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>HoMM3 Savegame Editor</h1>
+        <h1><abbr title="Heroes of Might and Magic III">HoMM3</abbr> Saved Game Editor</h1>
       </header>
 
       {!game && (
-        <section
-          className="dropzone"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-        >
-          <input
-            type="file"
-            accept=".cgm,.gm1,.gm2,*.*gm"
-            onChange={(e) => e.target.files?.[0] && openFile(e.target.files[0])}
-          />
-          <p>{loading ? 'Loading…' : 'Drop a .CGM / .GM1 save or click to browse'}</p>
-        </section>
+        <>
+          <section className="panel intro">
+            <h2>Edit your heroes</h2>
+            <p>
+              Open a Heroes of Might and Magic III save and change hero stats, secondary skills,
+              army stacks, war machines, artifacts, inventory, and known spells. Download the
+              edited save when you are done and put it back in your saves folder.
+            </p>
+
+            <h3>Supported games &amp; files</h3>
+            <ul>
+              <li>Classic expansions (Restoration of Erathia, Armageddon&apos;s Blade, Shadow of Death, and related builds)</li>
+              <li>Horn of the Abyss (HotA), including Cove, Factory, and Bulwark content where the save version supports it</li>
+              <li>Save types: <code>.GM1</code>, <code>.GM2</code>, and campaign <code>.CGM</code></li>
+            </ul>
+
+            <h3>Things that can go wrong</h3>
+            <ul>
+              <li>
+                Combination artifacts (Angelic Alliance, Armor of the Damned, Power of the Dragon
+                Father, and similar) block multiple equipment slots. Equipping or removing them
+                incorrectly can leave blocked slots, missing pieces, or a save the game refuses to load.
+              </li>
+              <li>
+                Safer option: put the finished combination artifact in the hero&apos;s backpack
+                (inventory) instead of equipping it in a gear slot. The hero can equip it in-game
+                so the game handles slot blocking correctly.
+              </li>
+              <li>
+                Keep a backup of the original save before downloading an edited one.
+              </li>
+            </ul>
+          </section>
+
+          <section
+            className="dropzone"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+          >
+            <input
+              type="file"
+              accept=".cgm,.gm1,.gm2,*.*gm"
+              onChange={(e) => e.target.files?.[0] && openFile(e.target.files[0])}
+            />
+            <p>{loading ? 'Loading…' : '⬆️ Drop a .CGM / .GM1 / .GM2 save or click to browse'}</p>
+          </section>
+        </>
       )}
 
       {error && <div className="banner error">{error}</div>}
@@ -324,15 +359,23 @@ export default function App() {
           {' '}for Windows.
         </p>
         <p>
-          Made by Vance Lucas (
+          Made by{' '}
           <a
             href="https://vancelucas.com"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://vancelucas.com
-          </a>
-          )
+            Vance Lucas
+          </a>.
+
+          Source code on {' '}
+          <a
+            href="https://github.com/vlucas/homm3-savegame-editor"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+          GitHub
+          </a>.
         </p>
       </footer>
     </div>

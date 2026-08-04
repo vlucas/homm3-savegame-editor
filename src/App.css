@@ -125,6 +125,51 @@ body {
     0 0 18px rgba(201, 162, 39, 0.25);
 }
 
+/* —— Intro (pre-upload) —— */
+.intro h2 {
+  margin-bottom: 0.65rem;
+}
+
+.intro h3 {
+  font-family: Cinzel, serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+  margin: 1.15rem 0 0.4rem;
+  text-shadow: 0 1px 0 var(--bronze);
+}
+
+.intro p,
+.intro li {
+  color: var(--parchment);
+  line-height: 1.45;
+  font-size: 0.98rem;
+}
+
+.intro p {
+  margin: 0;
+}
+
+.intro ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.intro li {
+  margin-bottom: 0.4rem;
+}
+
+.intro li:last-child {
+  margin-bottom: 0;
+}
+
+.intro code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--gold-bright);
+}
+
 /* —— Dropzone —— */
 .dropzone {
   position: relative;
