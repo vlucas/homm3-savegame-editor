@@ -310,6 +310,31 @@ export default function App() {
           ))}
         </>
       )}
+
+      <footer className="app-footer">
+        <p>
+          This is a port of{' '}
+          <a
+            href="https://github.com/AlexSnowLeo/Heroes3Editor"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Heroes3Editor
+          </a>
+          {' '}for Windows.
+        </p>
+        <p>
+          Made by Vance Lucas (
+          <a
+            href="https://vancelucas.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            https://vancelucas.com
+          </a>
+          )
+        </p>
+      </footer>
     </div>
   );
 }
