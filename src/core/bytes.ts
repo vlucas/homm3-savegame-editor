@@ -21,6 +21,11 @@ export function writeInt16(bytes: Uint8Array, start: number, value: number): voi
   view.setInt16(start, value, true);
 }
 
+export function writeUint16(bytes: Uint8Array, start: number, value: number): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setUint16(start, value & 0xffff, true);
+}
+
 export function writeInt32(bytes: Uint8Array, start: number, value: number): void {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   view.setInt32(start, value, true);

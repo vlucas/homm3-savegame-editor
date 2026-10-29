@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Hero } from '../core/hero';
 import {
   GEAR_SLOTS,
@@ -6,11 +6,14 @@ import {
   creatureStackGroups,
   experienceForLevel,
   levelForExperience,
+  getSpellGroupsByLevel,
+  sortArtifactNames,
   MAX_HERO_LEVEL,
   MIN_HERO_LEVEL,
   type ArtifactGroup,
   type CreatureGroup,
 } from '../core/constants';
+import { SpellPicker } from './SpellPicker';
 
 interface Props {
   hero: Hero;
@@ -33,10 +36,13 @@ export function HeroEditor({
 }: Props) {
   const [, tick] = useState(0);
   const refresh = () => tick((n) => n + 1);
+  const spellGroups = useMemo(() => getSpellGroupsByLevel(spells), [spells]);
+  const sortedSkills = useMemo(() => sortArtifactNames(skills), [skills]);
+  const sortedSpells = useMemo(() => sortArtifactNames(spells), [spells]);
 
   return (
     <section className="panel hero-editor">
-      <h2>{hero.name} <span className="meta">@ 0x{hero.bytePosition.toString(16)}</span></h2>
+      <h2>{hero.name}</h2>
 
       <fieldset>
         <legend>Primary</legend>
@@ -103,7 +109,7 @@ export function HeroEditor({
                 onChange={(e) => { hero.updateSkill(slot, e.target.value || null); refresh(); }}
               >
                 <option value="">— empty —</option>
-                {skills.map((s) => <option key={s} value={s}>{s}</option>)}
+                {sortedSkills.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <select
                 value={hero.skillLevels[slot] || 1}
@@ -191,7 +197,7 @@ export function HeroEditor({
                     refresh();
                   }}
                 >
-                  {spells.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {sortedSpells.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
             </label>
@@ -201,22 +207,16 @@ export function HeroEditor({
 
       <fieldset>
         <legend>Spellbook</legend>
-        <div className="spell-grid">
-          {spells.map((sp) => (
-            <label key={sp} className="check">
-              <input
-                type="checkbox"
-                checked={hero.spellBook.has(sp)}
-                onChange={(e) => {
-                  if (e.target.checked) hero.addSpellToSpellBook(sp);
-                  else hero.removeSpellFromSpellBook(sp);
-                  refresh();
-                }}
-              />
-              {sp}
-            </label>
-          ))}
-        </div>
+        <SpellPicker
+          groups={spellGroups}
+          isChecked={(spell) => hero.spellBook.has(spell)}
+          onToggle={(spell, checked) => {
+            if (checked) hero.addSpellToSpellBook(spell);
+            else hero.removeSpellFromSpellBook(spell);
+            refresh();
+          }}
+          disabled={!hero.spellBookExist}
+        />
       </fieldset>
 
       <fieldset>
@@ -256,7 +256,7 @@ export function HeroEditor({
                     refresh();
                   }}
                 >
-                  {spells.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {sortedSpells.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
               <button type="button" onClick={() => { hero.removeFromInventory(i); refresh(); }}>Remove</button>

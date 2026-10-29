@@ -518,6 +518,82 @@ button.button-danger:hover:not(:disabled) {
   flex-shrink: 0;
 }
 
+.town-editor h2 {
+  margin-bottom: 0.75rem;
+}
+
+.building-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.building-chains {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.building-chains-dwellings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+
+.building-chain {
+  margin: 0;
+  padding: 0.4rem 0.65rem 0.55rem;
+  border: 1px solid var(--bronze);
+  background: rgba(20, 12, 8, 0.2);
+}
+
+.building-chain legend {
+  padding: 0 0.3rem;
+}
+
+.building-chain-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.85rem;
+}
+
+.building-subhead {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.spell-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.spell-list li {
+  justify-content: space-between;
+}
+
+.spell-level-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.spell-level-group {
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.75rem;
+  border: 1px solid var(--bronze);
+  background: rgba(20, 12, 8, 0.25);
+}
+
+.spell-level-group legend {
+  padding: 0 0.35rem;
+}
+
 .artifacts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -557,13 +633,29 @@ button.button-danger:hover:not(:disabled) {
   margin-bottom: 0.25rem;
 }
 
-.player-filter {
-  margin-bottom: 0.85rem;
-  gap: 0.5rem 1rem;
-  padding: 0.55rem 0.75rem;
-  background: rgba(20, 12, 8, 0.4);
-  border: 1px solid var(--bronze);
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.35);
+.entity-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 1.5rem;
+  align-items: flex-start;
+}
+
+.entity-search-field {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.entity-search-field h2 {
+  margin-top: 0;
+}
+
+.entity-search-field .row {
+  width: 100%;
+}
+
+.entity-search-field select {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .inventory-list {

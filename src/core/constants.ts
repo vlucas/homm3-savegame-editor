@@ -235,7 +235,45 @@ Items.namesByCode.set(0x59, 'Tome of Earth Magic');
 export const WarMachines = cls('WarMachines');
 WarMachines.namesByCode.set(0x04, 'Ballista');
 export const Spells = cls('Spells');
-Spells.namesByCode.set(57, "Titan's Lightning Bolt");
+
+/** Spell levels per https://heroes.thelazy.net/index.php/List_of_spells */
+const SPELL_LEVEL_BY_CODE: Record<number, number> = Object.fromEntries(
+  Object.entries(lookupData.spellLevelByCode as Record<string, number>).map(([code, level]) => [Number(code), level]),
+);
+
+export interface SpellLevelGroup {
+  level: number;
+  spells: string[];
+}
+
+export function getSpellLevel(spellName: string): number {
+  try {
+    return SPELL_LEVEL_BY_CODE[Spells.getCode(spellName)] ?? 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function getSpellLevelByCode(code: number): number {
+  return SPELL_LEVEL_BY_CODE[code] ?? 1;
+}
+
+export function getSpellGroupsByLevel(spellNames: readonly string[]): SpellLevelGroup[] {
+  const byLevel = new Map<number, string[]>();
+  for (const name of spellNames) {
+    const level = getSpellLevel(name);
+    const list = byLevel.get(level) ?? [];
+    list.push(name);
+    byLevel.set(level, list);
+  }
+  return [1, 2, 3, 4, 5]
+    .map((level) => ({
+      level,
+      spells: sortArtifactNames(byLevel.get(level) ?? []),
+    }))
+    .filter((group) => group.spells.length > 0);
+}
+
 export const Creatures = cls('Creatures');
 
 export const ItemsCodes = {
@@ -423,6 +461,18 @@ export class TownsRegistry {
 
   getLangFactionValue(key: string): string {
     return this.langFactions?.get(key) ?? key;
+  }
+
+  /** Resolve faction from a town display name using the name catalog. */
+  factionForTown(townName: string): string | null {
+    for (const faction of this.factions) {
+      const list = this.towns[faction] ?? [];
+      if (list.includes(townName)) return faction;
+    }
+    for (const [faction, list] of Object.entries(this.hotaTowns)) {
+      if (list.includes(townName)) return faction;
+    }
+    return null;
   }
 }
 
