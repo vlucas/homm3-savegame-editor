@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { Heroes, loadAllArtifacts } from '../src/core/constants';
+import { loadAllArtifacts } from '../src/core/constants';
 import { Game, groupPresentHeroes } from '../src/core/game';
 import { loadLangData } from '../src/core/lang';
 import { loadGzipModuleFromBytes, gzipDecompressWithModule, type Homm3GzipModule } from '../src/wasm/gzip';
@@ -66,6 +66,31 @@ const FIXTURE_EXPECTATIONS: Record<string, string[]> = {
     'Tancred (Player 1 (Red))',
     'Vidomina (Player 6 (Purple))',
   ],
+  'HotA-1.8.1-333.GM1': [
+    'Blinky3 (Player 1 (Red))',
+    'Blinky5 (Player 1 (Red))',
+    'Blinky7 (Player 1 (Red))',
+    'Blinky8 (Player 1 (Red))',
+    'Clyde3 (Player 5 (Orange))',
+    'Clyde7 (Player 5 (Orange))',
+    'Clyde8 (Player 5 (Orange))',
+    'Inky4 (Player 7 (Teal))',
+    'Inky5 (Player 7 (Teal))',
+    'Inky7 (Player 7 (Teal))',
+    'Inky8 (Player 7 (Teal))',
+    'Pinky2 (Player 8 (Pink))',
+    'Pinky5 (Player 8 (Pink))',
+    'Pinky6 (Player 8 (Pink))',
+    'Pinky8 (Player 8 (Pink))',
+    'Specter (Player 3 (Tan))',
+    'Terranis (Player 6 (Purple))',
+  ],
+  'HotA-1.8.1-BarbarianBreakout-Day1.GM1': [
+    'Caitlin (Player 1 (Red))',
+    'Gurnisson (Player 2 (Blue))',
+    'Wrathmont (Player 3 (Tan))',
+    'Yog (Player 4 (Green))',
+  ],
 };
 
 describe('saved game fixtures', () => {
@@ -80,13 +105,14 @@ describe('saved game fixtures', () => {
   for (const file of files) {
     it(`${file}: lists player-owned on-map heroes`, async () => {
       const game = await loadSaveFixture(file);
-      const naiveCount = Heroes.names.filter((n) => game.searchHeroExt(n) !== -1).length;
-      const present = game.listPresentHeroes(Heroes.names);
+      const present = game.listPresentHeroes();
+      const all = game.listAllHeroesInSave();
       const owned = present.filter((h) => h.player <= 7);
       const ownedLabels = owned.map((h) => h.label);
 
       expect(owned.length).toBeGreaterThan(0);
-      expect(present.length).toBeLessThan(naiveCount);
+      // On-map list excludes roster-pool templates.
+      expect(present.length).toBeLessThan(all.length);
 
       const groups = groupPresentHeroes(present);
       for (const group of groups) {
@@ -110,8 +136,8 @@ describe('saved game fixtures', () => {
 
     it(`${file}: lists all hero structs including roster pool`, async () => {
       const game = await loadSaveFixture(file);
-      const onMap = game.listPresentHeroes(Heroes.names);
-      const all = game.listAllHeroesInSave(Heroes.names);
+      const onMap = game.listPresentHeroes();
+      const all = game.listAllHeroesInSave();
 
       expect(all.length).toBeGreaterThan(onMap.length);
 
@@ -126,7 +152,7 @@ describe('saved game fixtures', () => {
 
     it(`${file}: opens every on-map hero`, async () => {
       const game = await loadSaveFixture(file);
-      const onMap = game.listPresentHeroes(Heroes.names);
+      const onMap = game.listPresentHeroes();
 
       for (const entry of onMap) {
         expect(game.searchHero(entry.name, entry.player)).toBe(true);
@@ -166,8 +192,8 @@ describe('HotA hotseat player hero audit', () => {
 
   it('lists heroes for player 1 and player 2', async () => {
     const game = await loadSaveFixture(HOTSEAT_SAVE);
-    const onMap = game.listPresentHeroes(Heroes.names);
-    const allInSave = game.listAllHeroesInSave(Heroes.names);
+    const onMap = game.listPresentHeroes();
+    const allInSave = game.listAllHeroesInSave();
 
     const report = {
       save: HOTSEAT_SAVE,

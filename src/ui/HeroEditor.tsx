@@ -23,6 +23,7 @@ interface Props {
   creatureGroups: CreatureGroup[];
   inventoryArtifactGroups: ArtifactGroup[];
   warMachines: string[];
+  onChange?: () => void;
 }
 
 export function HeroEditor({
@@ -33,15 +34,23 @@ export function HeroEditor({
   creatureGroups,
   inventoryArtifactGroups,
   warMachines,
+  onChange,
 }: Props) {
   const [, tick] = useState(0);
-  const refresh = () => tick((n) => n + 1);
+  const refresh = () => {
+    tick((n) => n + 1);
+    onChange?.();
+  };
   const spellGroups = useMemo(() => getSpellGroupsByLevel(spells), [spells]);
   const sortedSkills = useMemo(() => sortArtifactNames(skills), [skills]);
   const sortedSpells = useMemo(() => sortArtifactNames(spells), [spells]);
 
   return (
-    <section className="panel hero-editor">
+    <section
+      className="panel hero-editor"
+      id={`hero-editor-${hero.bytePosition}`}
+      data-hero-pos={hero.bytePosition}
+    >
       <h2>{hero.name}</h2>
 
       <fieldset>
