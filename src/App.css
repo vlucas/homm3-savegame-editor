@@ -58,14 +58,17 @@ body {
 }
 
 .app.app-with-save {
-  max-width: 1400px;
+  max-width: min(1400px, 100%);
+  width: 100%;
 }
 
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
   gap: 1.25rem;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .app-main {
@@ -162,7 +165,9 @@ body {
 }
 
 .changes-hero-title {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   width: 100%;
   text-align: left;
   font-family: Cinzel, 'Times New Roman', serif;
@@ -183,6 +188,29 @@ body {
   text-decoration: underline;
   text-underline-offset: 0.12em;
   outline: none;
+}
+
+.player-flag {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 11px;
+  margin-left: 0.15rem;
+  vertical-align: middle;
+  clip-path: polygon(0 0, 100% 0, 78% 50%, 100% 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  cursor: help;
+}
+
+.changes-hero-title .player-flag {
+  margin-left: auto;
+}
+
+.entity-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .changes-hero-title .meta {
@@ -206,7 +234,7 @@ body {
   margin-bottom: 0.25rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -453,14 +481,6 @@ body {
   min-width: 0;
 }
 
-.primary-stats > label.primary-spellbook {
-  flex: 0 0 auto;
-  flex-direction: row;
-  align-items: center;
-  padding-bottom: 0.45rem;
-  white-space: nowrap;
-}
-
 .skills-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -507,6 +527,24 @@ legend {
   color: var(--gold);
   padding: 0 0.4rem;
   text-transform: uppercase;
+}
+
+.legend-check {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+fieldset.spellbook-minimized {
+  padding-top: 0.35rem;
+  padding-bottom: 0.55rem;
+}
+
+.spellbook-missing {
+  margin: 0.15rem 0 0;
 }
 
 label {

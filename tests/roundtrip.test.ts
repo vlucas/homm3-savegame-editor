@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { loadAllArtifacts } from '../src/core/constants';
+import { loadAllArtifacts, WarMachines } from '../src/core/constants';
 import { Game } from '../src/core/game';
 import type { Hero } from '../src/core/hero';
 import {
@@ -198,5 +198,28 @@ describe('end-to-end save round-trip', () => {
     expect(again.warMachines.has('First Aid Tent')).toBe(true);
     expect(again.warMachines.has('Ammo Cart')).toBe(false);
     expect(again.warMachines.has('Catapult')).toBe(false);
+  }, 30000);
+
+  it('keeps Ballista and Cannon from occupying the same slot', async () => {
+    const game = await loadFixture();
+    WarMachines.loadHotaReferenceCodes();
+    try {
+      const hero = openHero(game);
+      hero.addWarMachine('Ballista');
+      hero.addWarMachine('Ammo Cart');
+      hero.addWarMachine('Canon');
+
+      expect(hero.warMachines.has('Canon')).toBe(true);
+      expect(hero.warMachines.has('Ballista')).toBe(false);
+      expect(hero.warMachines.has('Ammo Cart')).toBe(true);
+      expect(game.bytes[hero.bytePosition + game.offsets.Canon]).toBe(WarMachines.getCode('Canon'));
+
+      hero.addWarMachine('Ballista');
+      expect(hero.warMachines.has('Ballista')).toBe(true);
+      expect(hero.warMachines.has('Canon')).toBe(false);
+      expect(game.bytes[hero.bytePosition + game.offsets.Ballista]).toBe(WarMachines.getCode('Ballista'));
+    } finally {
+      if (!game.isHOTA) WarMachines.removeHotaReferenceCodes();
+    }
   }, 30000);
 });

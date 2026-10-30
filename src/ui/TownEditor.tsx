@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useStore } from '@nanostores/react';
 import type { Town } from '../core/town';
 import {
   buildingLabelForTown,
@@ -10,6 +11,7 @@ import {
   type BuildingChain,
 } from '../core/town-constants';
 import {
+  creatureGroupsForFaction,
   creatureStackGroups,
   getSpellGroupsByLevel,
   getSpellLevel,
@@ -17,12 +19,15 @@ import {
   type CreatureGroup,
 } from '../core/constants';
 import { formatPlayerLabel, type TownSummary } from '../core/game';
+import { townEditsStore } from '../stores/town-edits';
 import { SpellPicker } from './SpellPicker';
+import { PlayerFlag } from './PlayerFlag';
 
 interface Props {
   town: Town;
   spells: string[];
   creatureGroups: CreatureGroup[];
+  onChange?: () => void;
 }
 
 function BuildingChainRadios({
@@ -58,17 +63,25 @@ function BuildingChainRadios({
   );
 }
 
-export function TownEditor({ town, spells, creatureGroups }: Props) {
+export function TownEditor({ town, spells, creatureGroups, onChange }: Props) {
+  const armyGroups = useMemo(
+    () => creatureGroupsForFaction(creatureGroups, town.faction),
+    [creatureGroups, town.faction],
+  );
   const [, tick] = useState(0);
-  const refresh = () => tick((n) => n + 1);
+  const refresh = () => {
+    tick((n) => n + 1);
+    onChange?.();
+  };
   const spellGroups = useMemo(() => getSpellGroupsByLevel(spells), [spells]);
   const guildLevel = town.mageGuildLevel();
   const hasLibrary = town.hasLibrary();
 
   return (
-    <section className="panel town-editor">
-      <h2>
-        {town.name}{' '}
+    <section className="panel town-editor" id={`town-editor-${town.bytePosition}`}>
+      <h2 className="entity-title">
+        {town.name}
+        <PlayerFlag player={town.owner} />
         <span className="meta">{town.factionLang}</span>
       </h2>
 
@@ -108,7 +121,7 @@ export function TownEditor({ town, spells, creatureGroups }: Props) {
                 }}
               >
                 <option value="">— empty —</option>
-                {creatureStackGroups(creature, creatureGroups).map((group) => (
+                {creatureStackGroups(creature, armyGroups).map((group) => (
                   <optgroup key={group.label} label={group.label}>
                     {group.creatures.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -205,9 +218,16 @@ export function TownList({
   selection: number | '';
   onSelect: (bytePosition: number) => void;
 }) {
+  const edits = useStore(townEditsStore);
   if (towns.length === 0) {
     return <p className="hint">No towns detected in this save.</p>;
   }
+
+  const selectedOwner = selection === ''
+    ? null
+    : (edits.entries[selection]?.town.owner
+      ?? towns.find((town) => town.bytePosition === selection)?.owner
+      ?? null);
 
   return (
     <div className="row">
@@ -225,6 +245,7 @@ export function TownList({
           </option>
         ))}
       </select>
+      {selectedOwner != null && <PlayerFlag player={selectedOwner} />}
     </div>
   );
 }

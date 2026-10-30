@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 import { useStore } from '@nanostores/react';
 import { heroEditsStore } from '../stores/hero-edits';
+import { townEditsStore } from '../stores/town-edits';
 import { diffHero } from '../core/hero-diff';
+import { diffTown } from '../core/town-diff';
+import { PlayerFlag } from './PlayerFlag';
 
 interface Props {
   uiLang: string;
@@ -11,6 +14,8 @@ interface Props {
   onDownload: () => void;
   onClose: () => void;
   onSelectHero: (bytePosition: number) => void;
+  onSelectTown: (bytePosition: number) => void;
+  playerForHero: (bytePosition: number) => number;
 }
 
 export function ChangesSidebar({
@@ -21,13 +26,16 @@ export function ChangesSidebar({
   onDownload,
   onClose,
   onSelectHero,
+  onSelectTown,
+  playerForHero,
 }: Props) {
-  const state = useStore(heroEditsStore);
+  const heroState = useStore(heroEditsStore);
+  const townState = useStore(townEditsStore);
 
-  // `revision` forces a fresh diff after in-place Hero mutations.
-  const groups = useMemo(() => {
-    const revision = state.revision;
-    return Object.values(state.entries)
+  // `revision` forces a fresh diff after in-place mutations.
+  const heroGroups = useMemo(() => {
+    const revision = heroState.revision;
+    return Object.values(heroState.entries)
       .map(({ hero, baseline }) => ({
         hero,
         lines: diffHero(baseline, hero),
@@ -38,15 +46,38 @@ export function ChangesSidebar({
         a.hero.name.localeCompare(b.hero.name, undefined, { sensitivity: 'base' })
         || a.hero.bytePosition - b.hero.bytePosition,
       );
-  }, [state.entries, state.revision]);
+  }, [heroState.entries, heroState.revision]);
 
-  const nameCounts = useMemo(() => {
+  const townGroups = useMemo(() => {
+    const revision = townState.revision;
+    return Object.values(townState.entries)
+      .map(({ town, baseline }) => ({
+        town,
+        lines: diffTown(baseline, town),
+        revision,
+      }))
+      .filter((g) => g.lines.length > 0)
+      .sort((a, b) =>
+        a.town.name.localeCompare(b.town.name, undefined, { sensitivity: 'base' })
+        || a.town.bytePosition - b.town.bytePosition,
+      );
+  }, [townState.entries, townState.revision]);
+
+  const heroNameCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const g of groups) {
+    for (const g of heroGroups) {
       counts.set(g.hero.name, (counts.get(g.hero.name) ?? 0) + 1);
     }
     return counts;
-  }, [groups]);
+  }, [heroGroups]);
+
+  const townNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const g of townGroups) {
+      counts.set(g.town.name, (counts.get(g.town.name) ?? 0) + 1);
+    }
+    return counts;
+  }, [townGroups]);
 
   return (
     <aside className="app-sidebar" aria-label="Save controls and edit preview">
@@ -72,23 +103,53 @@ export function ChangesSidebar({
         </div>
 
         <div className="changes-body">
-          {groups.length === 0 ? (
+          {heroGroups.length === 0 && townGroups.length === 0 ? (
             <p className="hint">No edits yet</p>
           ) : (
             <div className="changes-list">
-              {groups.map(({ hero, lines }) => {
-                const showPos = (nameCounts.get(hero.name) ?? 0) > 1;
+              {heroGroups.map(({ hero, lines }) => {
+                const showPos = (heroNameCounts.get(hero.name) ?? 0) > 1;
                 return (
-                  <section key={hero.bytePosition} className="changes-hero">
+                  <section key={`hero-${hero.bytePosition}`} className="changes-hero">
                     <button
                       type="button"
                       className="changes-hero-title"
                       onClick={() => onSelectHero(hero.bytePosition)}
                     >
-                      Hero &apos;{hero.name}&apos;
-                      {showPos && (
-                        <span className="meta"> @ 0x{hero.bytePosition.toString(16)}</span>
-                      )}
+                      <span>
+                        Hero &apos;{hero.name}&apos;
+                        {showPos && (
+                          <span className="meta"> @ 0x{hero.bytePosition.toString(16)}</span>
+                        )}
+                      </span>
+                      <PlayerFlag player={playerForHero(hero.bytePosition)} />
+                    </button>
+                    <ul>
+                      {lines.map((line) => (
+                        <li key={`${line.category}:${line.text}`}>
+                          {line.category}: {line.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+              {townGroups.map(({ town, lines }) => {
+                const showPos = (townNameCounts.get(town.name) ?? 0) > 1;
+                return (
+                  <section key={`town-${town.bytePosition}`} className="changes-hero">
+                    <button
+                      type="button"
+                      className="changes-hero-title"
+                      onClick={() => onSelectTown(town.bytePosition)}
+                    >
+                      <span>
+                        Town &apos;{town.name}&apos;
+                        {showPos && (
+                          <span className="meta"> @ 0x{town.bytePosition.toString(16)}</span>
+                        )}
+                      </span>
+                      <PlayerFlag player={town.owner} />
                     </button>
                     <ul>
                       {lines.map((line) => (

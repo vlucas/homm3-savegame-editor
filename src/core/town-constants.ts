@@ -103,6 +103,8 @@ export const TOWN_BIT = {
   /** Factory second level-7 dwelling (Gantry); not in the classic 0–43 set. */
   DWELL_7B: 44,
   DWELL_7B_UP: 45,
+  /** Cove Frigate second upgrade: Gunpowder Warehouse (Sea Dogs). */
+  DWELL_3_UP2: 46,
 } as const;
 
 /** Tower Library is Special 6 in the HotA/SoD building table. */
@@ -151,6 +153,109 @@ export function buildingLabelForTown(def: TownBuildingDef, faction: string): str
   }
   return def.label;
 }
+
+/** Dwelling names in tier order. Factory is separate: it has two level-7 lines. */
+export const FACTION_DWELLING_LABELS: Record<string, readonly string[]> = {
+  Castle: [
+    'Guardhouse',
+    "Archers' Tower",
+    'Griffin Tower',
+    'Barracks',
+    'Monastery',
+    'Training Grounds',
+    'Portal of Glory',
+  ],
+  Rampart: [
+    'Centaur Stables',
+    'Dwarf Cottage',
+    'Homestead',
+    'Enchanted Spring',
+    'Dendroid Arches',
+    'Unicorn Glade',
+    'Dragon Cliffs',
+  ],
+  Tower: [
+    'Workshop',
+    'Parapet',
+    'Golem Factory',
+    'Mage Tower',
+    'Altar of Wishes',
+    'Golden Pavilion',
+    'Cloud Temple',
+  ],
+  Inferno: [
+    'Imp Crucible',
+    'Hall of Sins',
+    'Kennels',
+    'Demon Gate',
+    'Hell Hole',
+    'Fire Lake',
+    'Forsaken Palace',
+  ],
+  Necropolis: [
+    'Cursed Crypt',
+    'Graveyard',
+    'Tomb of Souls',
+    'Estate',
+    'Mausoleum',
+    'Hall of Darkness',
+    'Dragon Vault',
+  ],
+  Dungeon: [
+    'Warren',
+    'Harpy Loft',
+    'Pillar of Eyes',
+    'Chapel of Stilled Voices',
+    'Labyrinth',
+    'Manticore Lair',
+    'Dragon Cave',
+  ],
+  Stronghold: [
+    'Goblin Barracks',
+    'Wolf Pen',
+    'Orc Tower',
+    'Ogre Fort',
+    'Cliff Nest',
+    'Cyclops Cave',
+    'Behemoth Lair',
+  ],
+  Fortress: [
+    'Gnoll Hut',
+    'Lizard Den',
+    'Serpent Fly Hive',
+    'Basilisk Pit',
+    'Gorgon Lair',
+    'Wyvern Nest',
+    'Hydra Pond',
+  ],
+  Conflux: [
+    'Magic Lantern',
+    'Altar of Air',
+    'Altar of Water',
+    'Altar of Fire',
+    'Altar of Earth',
+    'Altar of Thought',
+    'Pyre',
+  ],
+  Cove: [
+    'Nymph Waterfall',
+    'Shack',
+    'Frigate',
+    'Nest',
+    'Tower of the Seas',
+    'Nix Fort',
+    'Maelstrom',
+  ],
+  Bulwark: [
+    'Colliery',
+    'Frigid Spur',
+    'Hall of the Bold',
+    'Mountain Embassy',
+    'Shaman Fane',
+    'Mammoth Stalls',
+    'Frosthome',
+  ],
+};
 
 /** Factory dwelling names (two parallel level-7 lines: Serpentarium + Gantry). */
 export const FACTORY_DWELLING_LABELS = [
@@ -225,7 +330,11 @@ export const TOWN_MAGE_GUILD_CHAIN: BuildingChain = {
   ],
 };
 
-export function townDwellingChain(tier: number, label = `Dwelling ${tier}`): BuildingChain {
+export function townDwellingChain(
+  tier: number,
+  label = `Dwelling ${tier}`,
+  furtherUpgrades: { label: string; absBit: number }[] = [],
+): BuildingChain {
   const baseBit = tier <= 7 ? TOWN_BIT.DWELL_1 + tier - 1 : TOWN_BIT.DWELL_7B;
   const upBit = tier <= 7 ? TOWN_BIT.DWELL_1_UP + tier - 1 : TOWN_BIT.DWELL_7B_UP;
   return {
@@ -234,11 +343,13 @@ export function townDwellingChain(tier: number, label = `Dwelling ${tier}`): Bui
     steps: [
       buildingDef(label, baseBit),
       buildingDef(`${label} (Upg)`, upBit),
+      ...furtherUpgrades.map((step) => buildingDef(step.label, step.absBit)),
     ],
     options: [
       { value: 0, label: 'None' },
       { value: 1, label: 'Built' },
       { value: 2, label: 'Upgraded' },
+      ...furtherUpgrades.map((step, index) => ({ value: 3 + index, label: step.label })),
     ],
   };
 }
@@ -253,7 +364,17 @@ export const FACTORY_DWELLING_CHAINS: BuildingChain[] = [
 ];
 
 export function dwellingChainsForFaction(faction: string): BuildingChain[] {
-  return faction === 'Factory' ? FACTORY_DWELLING_CHAINS : TOWN_DWELLING_CHAINS;
+  if (faction === 'Factory') return FACTORY_DWELLING_CHAINS;
+  const labels = FACTION_DWELLING_LABELS[faction];
+  if (!labels) return TOWN_DWELLING_CHAINS;
+  return labels.map((label, index) => {
+    if (faction === 'Cove' && label === 'Frigate') {
+      return townDwellingChain(index + 1, label, [
+        { label: 'Gunpowder Warehouse', absBit: TOWN_BIT.DWELL_3_UP2 },
+      ]);
+    }
+    return townDwellingChain(index + 1, label);
+  });
 }
 
 export const TOWN_STANDALONE_BUILDINGS: TownBuildingDef[] = [

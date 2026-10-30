@@ -41,7 +41,11 @@ export function hasHotALeadMarker(bytes: Uint8Array, recordStart: number): boole
   if (b4a === 0xff && b4b === 0xff) {
     return b4c <= 127 && (b4d === 0x00 || b4d === 0x7f);
   }
+  // One-sided ff markers (Kergar ff bb, New Dolere b6 ff). A zero partner is
+  // not a name-table entry — 1.8.1 saves have a 00 ff 00 00 hit that decodes as "!".
   if (b4a === 0xff || b4b === 0xff) {
+    const other = b4a === 0xff ? b4b : b4a;
+    if (other === 0x00) return false;
     return b4c <= 127 && (b4d === 0x00 || b4d === 0x7f || b4d === 0x7e);
   }
   return false;

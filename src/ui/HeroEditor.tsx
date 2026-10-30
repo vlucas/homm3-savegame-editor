@@ -3,8 +3,10 @@ import type { Hero } from '../core/hero';
 import {
   GEAR_SLOTS,
   gearSlotArtifactOptions,
+  creatureGroupsForFaction,
   creatureStackGroups,
   experienceForLevel,
+  factionForHeroName,
   levelForExperience,
   getSpellGroupsByLevel,
   sortArtifactNames,
@@ -14,6 +16,7 @@ import {
   type CreatureGroup,
 } from '../core/constants';
 import { SpellPicker } from './SpellPicker';
+import { PlayerFlag } from './PlayerFlag';
 
 interface Props {
   hero: Hero;
@@ -44,6 +47,11 @@ export function HeroEditor({
   const spellGroups = useMemo(() => getSpellGroupsByLevel(spells), [spells]);
   const sortedSkills = useMemo(() => sortArtifactNames(skills), [skills]);
   const sortedSpells = useMemo(() => sortArtifactNames(spells), [spells]);
+  const armyGroups = useMemo(
+    () => creatureGroupsForFaction(creatureGroups, factionForHeroName(hero.name)),
+    [creatureGroups, hero.name],
+  );
+  const takenSkills = new Set(hero.skills.filter((skill): skill is string => Boolean(skill)));
 
   return (
     <section
@@ -51,7 +59,10 @@ export function HeroEditor({
       id={`hero-editor-${hero.bytePosition}`}
       data-hero-pos={hero.bytePosition}
     >
-      <h2>{hero.name}</h2>
+      <h2 className="entity-title">
+        {hero.name}
+        <PlayerFlag player={hero.game.getHeroPlayer(hero.bytePosition)} />
+      </h2>
 
       <fieldset>
         <legend>Primary</legend>
@@ -101,10 +112,6 @@ export function HeroEditor({
             Mana
             <input type="number" min={0} value={hero.mana} onChange={(e) => { hero.updateMana(Number(e.target.value)); refresh(); }} />
           </label>
-          <label className="check primary-spellbook">
-            <input type="checkbox" checked={hero.spellBookExist} onChange={(e) => { hero.toggleSpellBook(e.target.checked); refresh(); }} />
-            Spellbook
-          </label>
         </div>
       </fieldset>
 
@@ -118,7 +125,11 @@ export function HeroEditor({
                 onChange={(e) => { hero.updateSkill(slot, e.target.value || null); refresh(); }}
               >
                 <option value="">— empty —</option>
-                {sortedSkills.map((s) => <option key={s} value={s}>{s}</option>)}
+                {sortedSkills.map((s) => (
+                  <option key={s} value={s} disabled={takenSkills.has(s) && s !== skill}>
+                    {s}
+                  </option>
+                ))}
               </select>
               <select
                 value={hero.skillLevels[slot] || 1}
@@ -142,7 +153,7 @@ export function HeroEditor({
                 onChange={(e) => { hero.updateCreature(i, e.target.value || null); refresh(); }}
               >
                 <option value="">— empty —</option>
-                {creatureStackGroups(cr, creatureGroups).map((group) => (
+                {creatureStackGroups(cr, armyGroups).map((group) => (
                   <optgroup key={group.label} label={group.label}>
                     {group.creatures.map((c) => <option key={`${group.label}-${c}`} value={c}>{c}</option>)}
                   </optgroup>
@@ -214,18 +225,34 @@ export function HeroEditor({
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>Spellbook</legend>
-        <SpellPicker
-          groups={spellGroups}
-          isChecked={(spell) => hero.spellBook.has(spell)}
-          onToggle={(spell, checked) => {
-            if (checked) hero.addSpellToSpellBook(spell);
-            else hero.removeSpellFromSpellBook(spell);
-            refresh();
-          }}
-          disabled={!hero.spellBookExist}
-        />
+      <fieldset
+        className={hero.spellBookExist ? undefined : 'spellbook-minimized'}
+        disabled={!hero.spellBookExist}
+      >
+        <legend>
+          <label className="check legend-check">
+            <input
+              type="checkbox"
+              checked={hero.spellBookExist}
+              onChange={(e) => { hero.toggleSpellBook(e.target.checked); refresh(); }}
+            />
+            Has Spellbook
+          </label>
+        </legend>
+        {!hero.spellBookExist && (
+          <p className="hint spellbook-missing">Hero does not have a spellbook equipped</p>
+        )}
+        {hero.spellBookExist && (
+          <SpellPicker
+            groups={spellGroups}
+            isChecked={(spell) => hero.spellBook.has(spell)}
+            onToggle={(spell, checked) => {
+              if (checked) hero.addSpellToSpellBook(spell);
+              else hero.removeSpellFromSpellBook(spell);
+              refresh();
+            }}
+          />
+        )}
       </fieldset>
 
       <fieldset>

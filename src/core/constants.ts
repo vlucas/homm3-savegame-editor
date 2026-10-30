@@ -604,6 +604,8 @@ export function getInventoryArtifactGroups(): ArtifactGroup[] {
 
 export interface CreatureGroup {
   label: string;
+  /** Town faction key, when this group is a town's creatures. */
+  faction?: string;
   creatures: string[];
 }
 
@@ -618,7 +620,7 @@ const CREATURE_FACTION_DEFS: { faction: string; codes: number[]; hotaOnly?: bool
   { faction: 'Fortress', codes: [98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111] },
   { faction: 'Conflux', codes: [112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 123, 125, 127, 129, 130, 131] },
   { faction: 'Cove', codes: [153, 154, 155, 156, 157, 158, 151, 159, 160, 161, 162, 163, 164, 165, 166], hotaOnly: true },
-  { faction: 'Factory', codes: [171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185], hotaOnly: true },
+  { faction: 'Factory', codes: [138, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185], hotaOnly: true },
   { faction: 'Bulwark', codes: [186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199], hotaOnly: true },
 ];
 
@@ -640,12 +642,13 @@ export function getCreatureGroups(options: { isHota: boolean; withBulwark: boole
     if (creatures.length > 0) {
       groups.push({
         label: Towns.getLangFactionValue(def.faction),
+        faction: def.faction,
         creatures,
       });
     }
   }
   const neutralCodes = [
-    ...CLASSIC_NEUTRAL_CREATURE_CODES,
+    ...CLASSIC_NEUTRAL_CREATURE_CODES.filter((code) => !(options.isHota && code === 138)),
     ...(options.isHota ? HOTA_NEUTRAL_CREATURE_CODES : []),
   ];
   const neutrals = sortArtifactNames(creatureNamesForCodes(neutralCodes));
@@ -653,6 +656,60 @@ export function getCreatureGroups(options: { isHota: boolean; withBulwark: boole
     groups.push({ label: 'Neutral', creatures: neutrals });
   }
   return groups;
+}
+
+/** Put this town or hero's creatures first. The other groups stay in their usual order. */
+export function creatureGroupsForFaction(
+  groups: CreatureGroup[],
+  faction: string | null | undefined,
+): CreatureGroup[] {
+  if (!faction) return groups;
+  const index = groups.findIndex((group) => group.faction === faction);
+  if (index <= 0) return groups;
+  return [groups[index], ...groups.slice(0, index), ...groups.slice(index + 1)];
+}
+
+const CLASSIC_HERO_FACTION_SPANS: [string, number, number][] = [
+  ['Castle', 0, 16],
+  ['Rampart', 16, 32],
+  ['Tower', 32, 48],
+  ['Inferno', 48, 64],
+  ['Necropolis', 64, 80],
+  ['Dungeon', 80, 96],
+  ['Stronghold', 96, 112],
+  ['Fortress', 112, 128],
+  ['Conflux', 128, 256],
+];
+
+/** heroesHota order: a few original-faction additions, then Cove, Factory, and Bulwark. */
+const HOTA_HERO_FACTION_SPANS: [string, number, number][] = [
+  ['Castle', 0, 1],
+  ['Rampart', 1, 2],
+  ['Fortress', 2, 3],
+  ['Necropolis', 3, 4],
+  ['Cove', 4, 23],
+  ['Factory', 23, 42],
+  ['Bulwark', 42, 256],
+];
+
+function factionForHeroIndex(index: number, spans: [string, number, number][]): string | null {
+  return spans.find(([, start, end]) => index >= start && index < end)?.[0] ?? null;
+}
+
+const heroFactionByName = new Map<string, string>();
+lookupData.heroes.forEach((name, index) => {
+  const faction = factionForHeroIndex(index, CLASSIC_HERO_FACTION_SPANS);
+  if (faction) heroFactionByName.set(name.trim(), faction);
+});
+lookupData.heroesHota.forEach((name, index) => {
+  const faction = factionForHeroIndex(index, HOTA_HERO_FACTION_SPANS);
+  if (faction) heroFactionByName.set(name.trim(), faction);
+});
+
+/** Native town of a hero, from the default name. Renamed heroes have no catalog type. */
+export function factionForHeroName(name: string): string | null {
+  const english = Heroes.langInverted?.get(name) ?? name;
+  return heroFactionByName.get(english.trim()) ?? null;
 }
 
 /** Keep an equipped stack visible even when its type is outside normal faction lists. */

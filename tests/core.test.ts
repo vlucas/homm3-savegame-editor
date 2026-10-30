@@ -91,7 +91,7 @@ describe('constants', () => {
   });
 
   it('groups creatures by faction in level order with alphabetized neutrals', async () => {
-    const { getCreatureGroups, Creatures, loadHotaItems } = await import('../src/core/constants');
+    const { getCreatureGroups, Creatures, loadHotaItems, creatureGroupsForFaction, factionForHeroName, sortArtifactNames, Skills } = await import('../src/core/constants');
     loadAllArtifacts();
     loadHotaItems(true);
 
@@ -114,7 +114,26 @@ describe('constants', () => {
     ]);
     expect(hota.find((g) => g.label === 'Bulwark')!.creatures[0]).toBe('Kobold');
     expect(hota.find((g) => g.label === 'Cove')!.creatures).toContain('Haspid');
+    expect(hota.find((g) => g.label === 'Factory')!.creatures[0]).toBe('Halfling');
+    expect(hota.find((g) => g.label === 'Neutral')!.creatures).not.toContain('Halfling');
+    expect(classic.find((g) => g.label === 'Neutral')!.creatures).toContain('Halfling');
     expect(Creatures.getByCode(186)).toBe('Kobold');
+
+    const coveFirst = creatureGroupsForFaction(hota, 'Cove');
+    expect(coveFirst[0].faction).toBe('Cove');
+    expect(coveFirst.slice(1).map((group) => group.label)).toEqual(
+      hota.filter((group) => group.faction !== 'Cove').map((group) => group.label),
+    );
+    expect(factionForHeroName('Corkes')).toBe('Cove');
+    expect(factionForHeroName('Bertram')).toBe('Factory');
+    expect(factionForHeroName('Haugir')).toBe('Bulwark');
+    expect(factionForHeroName('Christian')).toBe('Castle');
+    expect(factionForHeroName('Beatrice')).toBe('Castle');
+    expect(factionForHeroName('Blinky7')).toBeNull();
+
+    const skillNames = sortArtifactNames(Skills.names);
+    expect(skillNames[0]).toBe('Air Magic');
+    expect(skillNames).toEqual([...skillNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })));
   });
 });
 
@@ -273,6 +292,50 @@ describe('hero-diff', () => {
     expect(diffHero(baseline, current).map((l) => l.text)).toEqual([
       'Change Logistics (Basic → Expert)',
     ]);
+  });
+});
+
+describe('town-diff', () => {
+  it('reports owner, garrison, building, and spell changes', async () => {
+    const { snapshotTown, diffTown } = await import('../src/core/town-diff');
+    const { buildingDef, TOWN_BIT } = await import('../src/core/town-constants');
+    const { playerFlagTitle } = await import('../src/ui/PlayerFlag');
+    let owner = 0;
+    let hall = 1;
+    let tavern = true;
+    let creatures: (string | null)[] = [null, null, null, null, null, null, null];
+    let amounts = [0, 0, 0, 0, 0, 0, 0];
+    let spells: string[] = [];
+    const tavernDef = buildingDef('Tavern', TOWN_BIT.TAVERN);
+    const town = {
+      get owner() { return owner; },
+      faction: 'Castle',
+      get creatures() { return creatures; },
+      get creatureAmounts() { return amounts; },
+      getBuildingChainLevel: (chain: { id: string }) => (chain.id === 'hall' ? hall : 0),
+      isBuildingBuilt: (def: { byte: number; bit: number }) => (
+        def.byte === tavernDef.byte && def.bit === tavernDef.bit ? tavern : false
+      ),
+      spellNames: () => spells,
+    };
+    const baseline = snapshotTown(town as never);
+    owner = 4;
+    hall = 3;
+    tavern = false;
+    creatures = ['Pikeman', null, null, null, null, null, null];
+    amounts = [20, 0, 0, 0, 0, 0, 0];
+    spells = ['Magic Arrow'];
+
+    expect(diffTown(baseline, town as never).map((line) => `${line.category}: ${line.text}`)).toEqual([
+      'Owner: Change Owner (Player 1 (Red) → Player 5 (Orange))',
+      'Garrison: Add 20 Pikeman',
+      'Building: Change Hall (Town Hall → Capitol)',
+      'Building: Remove Tavern',
+      'Spell: Add Magic Arrow',
+    ]);
+    expect(playerFlagTitle(0)).toBe('Player 1 - Red');
+    expect(playerFlagTitle(4)).toBe('Player 5 - Orange');
+    expect(playerFlagTitle(255)).toBe('Neutral');
   });
 });
 

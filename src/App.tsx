@@ -30,6 +30,14 @@ import {
   notifyHeroEdited,
   trackHero,
 } from './stores/hero-edits';
+import {
+  clearTownEdits,
+  getTrackedTown,
+  hasPendingTownEdits,
+  notifyTownEdited,
+  trackTown,
+} from './stores/town-edits';
+import { PlayerFlag } from './ui/PlayerFlag';
 import './App.css';
 
 function downloadBlob(data: Uint8Array, fileName: string) {
@@ -104,6 +112,7 @@ export default function App() {
       const langData = await loadLangData(langKey);
       const g = await loadGame(file, langData);
       clearHeroEdits();
+      clearTownEdits();
       setGame(g);
       setOpenHeroes([]);
       setOpenTowns([]);
@@ -114,6 +123,7 @@ export default function App() {
       setError(e instanceof Error ? e.message : 'Failed to open save');
       setGame(null);
       clearHeroEdits();
+      clearTownEdits();
     } finally {
       setLoading(false);
     }
@@ -176,13 +186,32 @@ export default function App() {
 
   const openTownEditor = (bytePosition: number) => {
     if (!game) return;
-    game.openTowns = [];
-    const town = game.openTown(bytePosition);
-    if (town) {
-      setOpenTowns([town]);
-      setTownSelection(bytePosition);
-    }
+    const existing = getTrackedTown(bytePosition);
+    const town = existing ?? game.openTown(bytePosition);
+    if (!town) return;
+    if (!existing) trackTown(town);
+    game.openTowns = [town];
+    setOpenTowns([town]);
+    setTownSelection(bytePosition);
   };
+
+  const selectTownFromSidebar = useCallback((bytePosition: number) => {
+    if (!game) return;
+    const town = getTrackedTown(bytePosition);
+    if (!town) return;
+    game.openTowns = [town];
+    game.heroes = [];
+    setOpenTowns([town]);
+    setTownSelection(bytePosition);
+    setOpenHeroes([]);
+    setHeroSelection('');
+    setLastSearchKey('');
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`town-editor-${bytePosition}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [game]);
 
   const selectHeroFromSidebar = useCallback((bytePosition: number) => {
     if (!game) return;
@@ -224,6 +253,7 @@ export default function App() {
     const langData = await loadLangData(lang.toLowerCase());
     game.applyLang(langData);
     clearHeroEdits();
+    clearTownEdits();
     refreshHeroLists(game);
     setOpenHeroes([]);
     setOpenTowns([]);
@@ -233,11 +263,12 @@ export default function App() {
   };
 
   const closeSave = () => {
-    const message = hasPendingHeroEdits()
+    const message = hasPendingHeroEdits() || hasPendingTownEdits()
       ? 'Close this save? You will lose all unsaved edits.'
       : 'Close this save?';
     if (!window.confirm(message)) return;
     clearHeroEdits();
+    clearTownEdits();
     setGame(null);
     setMapHeroes([]);
     setAllHeroes([]);
@@ -356,6 +387,9 @@ export default function App() {
                             </optgroup>
                           ))}
                         </select>
+                        {heroSelection && (
+                          <PlayerFlag player={Number(heroSelection.slice(heroSelection.lastIndexOf('|') + 1))} />
+                        )}
                         <button
                           type="button"
                           onClick={() => searchHero(heroSelection)}
@@ -388,6 +422,7 @@ export default function App() {
                 town={town}
                 spells={Spells.names}
                 creatureGroups={creatureGroups}
+                onChange={notifyTownEdited}
               />
             ))}
 
@@ -414,6 +449,8 @@ export default function App() {
             onDownload={saveGame}
             onClose={closeSave}
             onSelectHero={selectHeroFromSidebar}
+            onSelectTown={selectTownFromSidebar}
+            playerForHero={(bytePosition) => game.getHeroPlayer(bytePosition)}
           />
         </div>
       )}

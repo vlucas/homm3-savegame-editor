@@ -36,8 +36,14 @@ import { isHotATownLayout, readTownName } from './town-scan';
 
 const SPELL_SENTINEL = new TextEncoder().encode('AVWu');
 const ON = 0x00;
-/** HotA building mask is the 4 bytes immediately after guild slot counts. */
+/**
+ * HotA 1.8.0 and earlier: 4 building bytes after guild slot counts, then a spell-presence
+ * dword. Dwelling bits live in 14 growth flags before the guild slots.
+ * HotA 1.8.1 (version minor >= 11): those 6 bytes are the full building mask, including
+ * dwellings. The following dword is not spell-presence, and the old growth window is unrelated.
+ */
 const HOTA_BUILDINGS_BYTES = 4;
+const HOTA_BUILDINGS_BYTES_WIDE = 6;
 
 export class Town {
   readonly bytePosition: number;
@@ -80,7 +86,12 @@ export class Town {
       this.garrisonCountOffset = TOWN_GARRISON_COUNT_OFFSET_HOTA;
       this.owner = game.bytes[bytePosition + TOWN_OWNER_OFFSET_HOTA];
       this.typeId = 0;
-      const located = locateHotABuildings(game.bytes, bytePosition, guild);
+      const located = locateHotABuildings(
+        game.bytes,
+        bytePosition,
+        guild,
+        game.version.major >= 44 && game.version.minor >= 11,
+      );
       this.buildingsOffset = located.offset;
       this.buildingsWritableBytes = located.writableBytes;
       this.growthOffset = located.growthOffset;
@@ -139,6 +150,8 @@ export class Town {
   updateOwner(player: number): void {
     const owner = Math.max(0, Math.min(255, Math.floor(player)));
     this.owner = owner;
+    const listed = this.game.towns.find((town) => town.bytePosition === this.bytePosition);
+    if (listed) listed.owner = owner;
     if (this.isHotA) {
       this.game.bytes[this.bytePosition + TOWN_OWNER_OFFSET_HOTA] = owner;
       return;
@@ -204,8 +217,11 @@ export class Town {
     else byte &= ~(1 << def.bit);
     this.buildings[def.byte] = byte;
 
-    // HotA's on-disk mask is only 4 bytes (no dwelling bits); dwellings sync via growth flags.
-    if (!isDwelling && def.byte < this.buildingsWritableBytes) {
+    // 1.8.0 stores dwellings in growth flags, so those bits stay out of the 4-byte mask.
+    // 1.8.1 stores them in the 6-byte mask (growthOffset < 0).
+    const persistInMask = def.byte < this.buildingsWritableBytes
+      && !(isDwelling && this.growthOffset >= 0);
+    if (persistInMask) {
       this.game.bytes[this.bytePosition + this.buildingsOffset + def.byte] = byte;
     }
 
@@ -461,14 +477,16 @@ export interface HotABuildingsLocation {
 }
 
 /**
- * HotA: building bits sit in the 4 bytes after mage-guild slot counts (VCMI BuildingID order).
- * The following dword is a spell-presence field (`xx 0N 00 00`, N in 0x0b–0x0f). Dwelling bits
- * are usually absent from that short mask — read 14 growth flags immediately before the guild slots.
+ * HotA building bits sit immediately after mage-guild slot counts (VCMI BuildingID order).
+ * 1.8.0: 4-byte mask, then a spell-presence dword (`xx 0N 00 00`, N in 0x0b–0x0f).
+ * Dwelling bits come from 14 growth flags immediately before the guild slots.
+ * 1.8.1 (`wideMask`): 6-byte mask already includes dwellings. Growth flags are not used.
  */
 export function locateHotABuildings(
   bytes: Uint8Array,
   recordStart: number,
   guild: GuildSpellSlots | null,
+  wideMask = false,
 ): HotABuildingsLocation {
   const buildings = new Uint8Array(TOWN_BUILDINGS_BYTES);
   if (!guild) {
@@ -478,6 +496,24 @@ export function locateHotABuildings(
   const offset = guild.offset + 5;
   const growthOffset = guild.offset - TOWN_GROWTH_SLOTS * 4;
   const abs = recordStart + offset;
+
+  if (wideMask) {
+    if (abs + HOTA_BUILDINGS_BYTES_WIDE > bytes.length) {
+      return synthesizeHotABuildings(guild.level, -1);
+    }
+    const mask = bytes.subarray(abs, abs + HOTA_BUILDINGS_BYTES_WIDE);
+    if (!isPlausibleWideHotABuildingMask(mask, guild.level)) {
+      return synthesizeHotABuildings(guild.level, -1);
+    }
+    buildings.set(mask);
+    return {
+      offset,
+      writableBytes: HOTA_BUILDINGS_BYTES_WIDE,
+      growthOffset: -1,
+      buildings,
+    };
+  }
+
   if (abs + HOTA_BUILDINGS_BYTES + 4 > bytes.length || growthOffset < 0) {
     return synthesizeHotABuildings(guild.level, -1);
   }
@@ -513,7 +549,17 @@ function synthesizeHotABuildings(guildLevel: number, growthOffset: number): HotA
   };
 }
 
-/** Spell-presence dword after the building mask: `xx 0N 00 00` with N in 0x0b–0x0f. */
+/** 1.8.1 mask: mage-guild bits agree with slot counts. Bits 44–47 hold Factory's second level-7 line and Cove's Frigate second upgrade. */
+function isPlausibleWideHotABuildingMask(mask: Uint8Array, guildLevel: number): boolean {
+  if (maxMageGuildLevel(mask) !== guildLevel) return false;
+  let built = 0;
+  for (let i = 0; i < HOTA_BUILDINGS_BYTES_WIDE * 8; i++) {
+    if (buildingBit(mask, i)) built += 1;
+  }
+  return built >= 1 && built <= 40;
+}
+
+/** Spell-presence dword after the 1.8.0 building mask: `xx 0N 00 00` with N in 0x0b–0x0f. */
 function isPlausibleHotABuildingMask(
   mask: Uint8Array,
   next: Uint8Array,

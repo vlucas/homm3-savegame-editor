@@ -14,6 +14,13 @@ import {
 } from './constants';
 import { getInt, getUint16, getUint32, writeInt16, writeInt32 } from './bytes';
 
+/** War machines that occupy the same hero slot. */
+const SHARED_WAR_MACHINE_SLOTS = [['Ballista', 'Canon']];
+
+function sharedWarMachineSlot(warMachine: string): string[] {
+  return SHARED_WAR_MACHINE_SLOTS.find((group) => group.includes(warMachine))?.filter((name) => name !== warMachine) ?? [];
+}
+
 export class Hero {
   readonly name: string;
   readonly bytePosition: number;
@@ -221,7 +228,11 @@ export class Hero {
   }
 
   addWarMachine(warMachine: string) {
-    if (!this.warMachines.add(warMachine)) return;
+    // Ballista and Cannon share one save slot, so only one can be equipped.
+    for (const other of sharedWarMachineSlot(warMachine)) {
+      this.warMachines.delete(other);
+    }
+    this.warMachines.add(warMachine);
     const pos = this.bytePosition + this.game.offsets[warMachine as keyof typeof this.game.offsets];
     this.game.bytes[pos] = WarMachines.getCode(warMachine);
     for (let j = 1; j < 4; j++) this.game.bytes[pos + j] = ON;

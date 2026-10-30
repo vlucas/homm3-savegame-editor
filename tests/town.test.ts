@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loadAllArtifacts } from '../src/core/constants';
 import { Game } from '../src/core/game';
-import { Town } from '../src/core/town';
+import { locateHotABuildings, Town } from '../src/core/town';
 import {
   FACTORY_DWELLING_CHAINS,
   TOWN_BIT,
@@ -15,8 +15,9 @@ import {
   TOWN_MAGE_GUILD_BUILDINGS,
   TOWN_MAGE_GUILD_CHAIN,
   buildingDef,
+  dwellingChainsForFaction,
 } from '../src/core/town-constants';
-import { isValidTownRecordAt, scanTownRecordStarts } from '../src/core/town-scan';
+import { hasHotALeadMarker, isValidTownRecordAt, scanTownRecordStarts } from '../src/core/town-scan';
 import {
   gzipCompressWithModule,
   gzipDecompressWithModule,
@@ -299,5 +300,135 @@ describe('town edit round-trip', () => {
     if (removedSpell) {
       expect(again.spellNames()).not.toContain(removedSpell);
     }
+  }, 30000);
+});
+
+describe('faction dwelling chains', () => {
+  it('gives Cove a third Frigate tier and Factory two level-7 dwellings', () => {
+    const cove = dwellingChainsForFaction('Cove');
+    const frigate = cove.find((chain) => chain.label === 'Frigate');
+    expect(frigate?.options.map((option) => option.label)).toEqual([
+      'None',
+      'Built',
+      'Upgraded',
+      'Gunpowder Warehouse',
+    ]);
+    expect(frigate?.steps[2] && ((frigate.steps[2].byte << 3) | frigate.steps[2].bit)).toBe(TOWN_BIT.DWELL_3_UP2);
+
+    const factory = dwellingChainsForFaction('Factory');
+    expect(factory.map((chain) => chain.label)).toEqual([
+      'Halfling Adobe',
+      'Foundry',
+      'Ranch',
+      'Manufactory',
+      'Catacombs',
+      'Watchtower',
+      'Serpentarium',
+      'Gantry',
+    ]);
+  });
+});
+
+describe('HotA 1.8.1 building mask', () => {
+  it('reads the 6-byte mask and ignores growth flags', () => {
+    // Noral (Cove) from Vance-Scenario2: Capitol, Castle, Tavern, Marketplace,
+    // Blacksmith, Mage Guild 1, dwellings 1–5, Nix Fort upgraded. Maelstrom absent.
+    const bytes = new Uint8Array(80);
+    bytes.set([5, 0, 0, 0, 0, 0x21, 0x62, 0x01, 0xc0, 0x07, 0x04], 56);
+    for (let i = 0; i < 14; i++) bytes[i * 4] = 1;
+
+    const located = locateHotABuildings(bytes, 0, {
+      offset: 56,
+      level: 1,
+      capacity: 5,
+      slots: [5, 0, 0, 0, 0],
+    }, true);
+
+    expect(located.writableBytes).toBe(6);
+    expect(located.growthOffset).toBe(-1);
+    const built = (bit: number) => ((located.buildings[bit >> 3] >> (bit & 7)) & 1) === 1;
+    expect(built(TOWN_BIT.MG1)).toBe(true);
+    expect(built(TOWN_BIT.MG2)).toBe(false);
+    expect(built(TOWN_BIT.TAVERN)).toBe(true);
+    expect(built(TOWN_BIT.SHIPYARD)).toBe(false);
+    expect(built(TOWN_BIT.CASTLE)).toBe(true);
+    expect(built(TOWN_BIT.FORT)).toBe(false);
+    expect(built(TOWN_BIT.CAPITOL)).toBe(true);
+    expect(built(TOWN_BIT.TOWN_HALL)).toBe(false);
+    expect(built(TOWN_BIT.MARKETPLACE)).toBe(true);
+    expect(built(TOWN_BIT.RESOURCE_SILO)).toBe(false);
+    expect(built(TOWN_BIT.BLACKSMITH)).toBe(true);
+    for (let tier = 0; tier < 5; tier++) expect(built(TOWN_BIT.DWELL_1 + tier)).toBe(true);
+    expect(built(TOWN_BIT.DWELL_1 + 5)).toBe(false);
+    expect(built(TOWN_BIT.DWELL_1_UP + 5)).toBe(true);
+    expect(built(TOWN_BIT.DWELL_1 + 6)).toBe(false);
+    expect(built(TOWN_BIT.DWELL_1_UP)).toBe(false);
+  });
+
+  it('rejects a zero partner on a one-sided HotA name marker', () => {
+    const bytes = new Uint8Array(0x50);
+    bytes[0x4a] = 0x00;
+    bytes[0x4b] = 0xff;
+    bytes[0x4c] = 0x00;
+    bytes[0x4d] = 0x00;
+    expect(hasHotALeadMarker(bytes, 0)).toBe(false);
+
+    bytes[0x4a] = 0xb6;
+    bytes[0x4b] = 0xff;
+    bytes[0x4c] = 0x04;
+    bytes[0x4d] = 0x7e;
+    expect(hasHotALeadMarker(bytes, 0)).toBe(true);
+
+    bytes[0x4a] = 0xff;
+    bytes[0x4b] = 0xff;
+    bytes[0x4c] = 0x01;
+    bytes[0x4d] = 0x00;
+    expect(hasHotALeadMarker(bytes, 0)).toBe(true);
+  });
+});
+
+const VANCE_SAVE = '/Users/vlucas/Games/Heroic/Heroes of Might and Magic III - Horn of the Abyss/games/Treasures of the Pyramid/Vance-Scenario2.GM1';
+
+describe('Vance-Scenario2 town hall', () => {
+  it.skipIf(!existsSync(VANCE_SAVE))('matches the in-game Cove hall for Noral', async () => {
+    const mod = await getGzipModule();
+    const bytes = await gzipDecompressWithModule(mod, readFileSync(VANCE_SAVE));
+    const game = new Game(bytes, 'Vance-Scenario2.GM1');
+    game.applyLang(null);
+    loadAllArtifacts();
+
+    expect(game.towns.map((t) => t.name).sort()).toEqual(['Forest', 'Mystos', 'Noral', 'Scar']);
+
+    const noral = new Town(game, game.towns.find((t) => t.name === 'Noral')!.bytePosition);
+    expect(noral.faction).toBe('Cove');
+    expect(noral.owner).toBe(4);
+    expect(noral.getBuildingChainLevel(TOWN_HALL_CHAIN)).toBe(3);
+    expect(noral.getBuildingChainLevel(TOWN_FORT_CHAIN)).toBe(3);
+    expect(noral.getBuildingChainLevel(TOWN_MAGE_GUILD_CHAIN)).toBeGreaterThanOrEqual(1);
+    expect(noral.isBuildingBuilt(buildingDef('Tavern', TOWN_BIT.TAVERN))).toBe(true);
+    expect(noral.isBuildingBuilt(buildingDef('Blacksmith', TOWN_BIT.BLACKSMITH))).toBe(true);
+    expect(noral.isBuildingBuilt(buildingDef('Marketplace', TOWN_BIT.MARKETPLACE))).toBe(true);
+    expect(noral.isBuildingBuilt(buildingDef('Shipyard', TOWN_BIT.SHIPYARD))).toBe(false);
+
+    const chains = dwellingChainsForFaction('Cove');
+    expect(chains.map((chain) => chain.label)).toEqual([
+      'Nymph Waterfall',
+      'Shack',
+      'Frigate',
+      'Nest',
+      'Tower of the Seas',
+      'Nix Fort',
+      'Maelstrom',
+    ]);
+    const levels = chains.map((chain) => noral.getBuildingChainLevel(chain));
+    expect(levels.filter((level) => level > 0).length).toBeGreaterThanOrEqual(4);
+    expect(levels[5]).toBeGreaterThanOrEqual(1);
+
+    const shipyard = buildingDef('Shipyard', TOWN_BIT.SHIPYARD);
+    const shipyardBuilt = noral.isBuildingBuilt(shipyard);
+    noral.setBuildingBuilt(shipyard, !shipyardBuilt);
+    const reopened = await roundTrip(game);
+    const again = new Town(reopened, reopened.towns.find((t) => t.name === 'Noral')!.bytePosition);
+    expect(again.isBuildingBuilt(shipyard)).toBe(!shipyardBuilt);
   }, 30000);
 });
