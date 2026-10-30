@@ -31,7 +31,7 @@ import {
   removeHotaReferenceCodes,
 } from './constants';
 import { heroNamePattern, indexOfPattern, startsWith } from './bytes';
-import { decodeSaveString, encodeWin1251 } from './encoding';
+import { decodeSaveString, decodeWin1251, encodeWin1251 } from './encoding';
 import { Hero } from './hero';
 import { gzipCompress, gzipDecompress } from '../wasm/gzip';
 
@@ -257,7 +257,8 @@ export class Game {
     if (bytePosition + need < 0 || bytePosition + o.HeroLevel >= b.length) return false;
 
     const level = b[bytePosition + o.HeroLevel];
-    if (level > 75) return false;
+    // Level 0 rejects town-name collisions and other non-hero structs.
+    if (level < 1 || level > 75) return false;
 
     const numSkills = b[bytePosition + o.NumOfSkills];
     if (numSkills > 28) return false;
@@ -316,39 +317,90 @@ export class Game {
     return this.bytes[bytePosition + this.heroOffsets.Player];
   }
 
+  /** Read the 13-byte null-padded hero name field at `bytePosition`. */
+  readHeroNameAt(bytePosition: number): string {
+    const chunk = this.bytes.subarray(bytePosition, bytePosition + 13);
+    let end = chunk.indexOf(0);
+    if (end < 0) end = chunk.length;
+    if (end <= 0) return '';
+    return decodeWin1251(chunk.subarray(0, end));
+  }
+
+  /**
+   * True when `bytePosition` looks like a HoMM3 hero name field:
+   * 1–12 non-null bytes, then nulls through offset 12.
+   */
+  isHeroNameFieldAt(bytePosition: number): boolean {
+    if (bytePosition < HERO_SCAN_START || bytePosition + 13 > this.bytes.length) {
+      return false;
+    }
+    const b = this.bytes;
+    if (b[bytePosition] === 0) return false;
+    let end = -1;
+    for (let i = 0; i < 13; i++) {
+      const c = b[bytePosition + i];
+      if (c === 0) {
+        end = i;
+        break;
+      }
+      if (c < 32) return false;
+    }
+    if (end < 1) return false;
+    for (let i = end + 1; i < 13; i++) {
+      if (b[bytePosition + i] !== 0) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Reject binary false positives from structural scans.
+   * Map editors allow Latin (and Cyrillic on RU) letters, digits, spaces, `'`, `-`.
+   */
+  isPlausibleHeroName(name: string): boolean {
+    if (this.lang === 'ru') {
+      return /^[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё0-9 '\-]{1,11}$/u.test(name);
+    }
+    return /^[A-Z][A-Za-z0-9 '\-]{1,11}$/.test(name);
+  }
+
   /** Heroes on the map (player-owned or neutral), excluding the roster pool. */
-  listPresentHeroes(candidates: readonly string[]): PresentHero[] {
-    return this.listHeroEntries(candidates, (p) => this.isListedHeroAt(p));
+  listPresentHeroes(_candidates?: readonly string[]): PresentHero[] {
+    return this.listHeroEntries((p) => this.isListedHeroAt(p));
   }
 
   /** Every hero struct in the save, including roster-pool templates. */
-  listAllHeroesInSave(candidates: readonly string[]): PresentHero[] {
-    return this.listHeroEntries(candidates, (p) => this.isValidHeroAt(p));
+  listAllHeroesInSave(_candidates?: readonly string[]): PresentHero[] {
+    return this.listHeroEntries((p) => this.isValidHeroAt(p));
   }
 
+  /**
+   * Discover heroes by scanning for name fields that pass `include`.
+   * Finds renamed/custom map heroes that are absent from the catalog.
+   */
   private listHeroEntries(
-    candidates: readonly string[],
     include: (bytePosition: number) => boolean,
   ): PresentHero[] {
     const seen = new Set<string>();
     const entries: PresentHero[] = [];
+    const end = this.bytes.length - 13;
 
-    for (const name of candidates) {
-      for (const pos of this.findHeroPositions(name)) {
-        if (!include(pos)) continue;
-        const player = this.getHeroPlayer(pos);
-        const key = presentHeroKey(name, player);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        entries.push({
-          name,
-          player,
-          key,
-          label: player === NEUTRAL_PLAYER
-            ? name
-            : `${name} (${formatPlayerLabel(player)})`,
-        });
-      }
+    for (let pos = HERO_SCAN_START; pos < end; pos++) {
+      if (!this.isHeroNameFieldAt(pos)) continue;
+      const name = this.readHeroNameAt(pos);
+      if (!this.isPlausibleHeroName(name)) continue;
+      if (!include(pos)) continue;
+      const player = this.getHeroPlayer(pos);
+      const key = presentHeroKey(name, player);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({
+        name,
+        player,
+        key,
+        label: player === NEUTRAL_PLAYER
+          ? name
+          : `${name} (${formatPlayerLabel(player)})`,
+      });
     }
 
     return groupPresentHeroes(entries).flatMap((g) => g.heroes);

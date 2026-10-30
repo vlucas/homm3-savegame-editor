@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Game, loadGame, groupPresentHeroes, formatPlayerLabel, type PresentHero } from './core/game';
-import { Heroes, LANG_CODES, Skills, Spells, WarMachines, SkillLevels, NEUTRAL_PLAYER, getInventoryArtifactGroups, getCreatureGroups } from './core/constants';
+import { LANG_CODES, Skills, Spells, WarMachines, SkillLevels, NEUTRAL_PLAYER, getInventoryArtifactGroups, getCreatureGroups } from './core/constants';
 import { loadLangData } from './core/lang';
 import { setCachedHeroes } from './core/hero-cache';
 import type { Hero } from './core/hero';
@@ -57,8 +57,8 @@ export default function App() {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
     try {
-      const onMap = g.listPresentHeroes(Heroes.names);
-      const all = g.listAllHeroesInSave(Heroes.names);
+      const onMap = g.listPresentHeroes();
+      const all = g.listAllHeroesInSave();
       setMapHeroes(onMap);
       setAllHeroes(all);
       setCachedHeroes(g, onMap);
