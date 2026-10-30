@@ -1,10 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Game, loadGame, groupPresentHeroes, formatPlayerLabel, type PresentHero } from './core/game';
-import { LANG_CODES, Skills, Spells, WarMachines, SkillLevels, NEUTRAL_PLAYER, getInventoryArtifactGroups, getCreatureGroups } from './core/constants';
+import {
+  Game,
+  loadGame,
+  groupPresentHeroes,
+  formatPlayerLabel,
+  presentHeroKey,
+  type PresentHero,
+} from './core/game';
+import {
+  LANG_CODES,
+  Skills,
+  Spells,
+  WarMachines,
+  SkillLevels,
+  NEUTRAL_PLAYER,
+  getInventoryArtifactGroups,
+  getCreatureGroups,
+} from './core/constants';
 import { loadLangData } from './core/lang';
 import { setCachedHeroes } from './core/hero-cache';
-import type { Hero } from './core/hero';
+import { Hero } from './core/hero';
 import { HeroEditor } from './ui/HeroEditor';
+import { ChangesSidebar } from './ui/ChangesSidebar';
+import {
+  clearHeroEdits,
+  getTrackedHero,
+  hasPendingHeroEdits,
+  notifyHeroEdited,
+  trackHero,
+} from './stores/hero-edits';
 import './App.css';
 
 const ALL_PLAYERS = [0, 1, 2, 3, 4, 5, 6, 7] as const;
@@ -52,7 +76,6 @@ export default function App() {
     setHeroesLoading(true);
     setMapHeroes([]);
     setAllHeroes([]);
-    // Yield so React can paint the loading message before the scan blocks.
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
@@ -80,6 +103,7 @@ export default function App() {
       const langKey = uiLang.toLowerCase();
       const langData = await loadLangData(langKey);
       const g = await loadGame(file, langData);
+      clearHeroEdits();
       setGame(g);
       setOpenHeroes([]);
       setHeroSelection('');
@@ -88,6 +112,7 @@ export default function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open save');
       setGame(null);
+      clearHeroEdits();
     } finally {
       setLoading(false);
     }
@@ -98,6 +123,14 @@ export default function App() {
     const file = e.dataTransfer.files[0];
     if (file) openFile(file);
   }, [openFile]);
+
+  const resolveHeroAt = useCallback((g: Game, name: string, bytePosition: number): Hero => {
+    const tracked = getTrackedHero(bytePosition);
+    if (tracked) return tracked;
+    const hero = new Hero(name, g, bytePosition);
+    trackHero(hero);
+    return hero;
+  }, []);
 
   const searchHero = (key: string) => {
     if (!game || !key) return;
@@ -113,20 +146,47 @@ export default function App() {
       setOpenHeroes([]);
     }
 
-    const ok = game.searchHero(entry.name, entry.player);
-    if (ok) {
-      setOpenHeroes([...game.heroes]);
-      setMessage(null);
-    } else {
+    const opened = new Set(game.heroes.map((h) => h.bytePosition));
+    const positions = game.findHeroPositions(entry.name).filter((p) => {
+      if (!game.isValidHeroAt(p)) return false;
+      return game.getHeroPlayer(p) === entry.player;
+    });
+    const bytePosition = positions.find((p) => !opened.has(p));
+
+    if (bytePosition === undefined) {
       const display = entry.player === NEUTRAL_PLAYER ? entry.name : entry.label;
       setMessage(
         game.heroes.some((h) => h.name === entry.name)
           ? `No further instances of ${display} found`
           : `Hero not found: ${display}`,
       );
+      setLastSearchKey(key);
+      return;
     }
+
+    const hero = resolveHeroAt(game, entry.name, bytePosition);
+    game.heroes.push(hero);
+    setOpenHeroes([...game.heroes]);
+    setMessage(null);
     setLastSearchKey(key);
   };
+
+  const selectHeroFromSidebar = useCallback((bytePosition: number) => {
+    if (!game) return;
+    const hero = getTrackedHero(bytePosition);
+    if (!hero) return;
+    const player = game.getHeroPlayer(bytePosition);
+    const key = presentHeroKey(hero.name, player);
+    setHeroSelection(key);
+    setLastSearchKey(key);
+    game.heroes = [hero];
+    setOpenHeroes([hero]);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`hero-editor-${bytePosition}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [game]);
 
   const saveGame = async () => {
     if (!game) return;
@@ -148,6 +208,7 @@ export default function App() {
     if (!game) return;
     const langData = await loadLangData(lang.toLowerCase());
     game.applyLang(langData);
+    clearHeroEdits();
     refreshHeroLists(game);
     setOpenHeroes([]);
     setHeroSelection('');
@@ -155,7 +216,11 @@ export default function App() {
   };
 
   const closeSave = () => {
-    if (!window.confirm('Close this save and discard unsaved changes?')) return;
+    const message = hasPendingHeroEdits()
+      ? 'Close this save? You will lose all unsaved edits.'
+      : 'Close this save?';
+    if (!window.confirm(message)) return;
+    clearHeroEdits();
     setGame(null);
     setMapHeroes([]);
     setAllHeroes([]);
@@ -191,7 +256,7 @@ export default function App() {
   }, [filteredHeroes, heroSelection]);
 
   return (
-    <div className="app">
+    <div className={`app${game ? ' app-with-save' : ''}`}>
       <header className="app-header">
         <h1><abbr title="Heroes of Might and Magic III">HoMM3</abbr> Saved Game Editor</h1>
       </header>
@@ -250,100 +315,101 @@ export default function App() {
       {message && <div className="banner info">{message}</div>}
 
       {game && (
-        <>
-          <section className="panel game-info">
-            <h2>Save Info</h2>
-            <dl>
-              <dt>File</dt><dd>{game.fileName}</dd>
-              <dt>Map</dt><dd>{game.mapName || '—'}</dd>
-              <dt>Version</dt><dd>{game.versionText}</dd>
-              <dt>Language</dt><dd>{game.lang.toUpperCase()}</dd>
-              <dt>Towns found</dt><dd>{game.towns.length}</dd>
-              <dt>Heroes on map</dt><dd>{mapHeroes.length}</dd>
-            </dl>
-            <div className="row">
-              <label>
-                UI language
-                <select value={uiLang} onChange={(e) => changeUiLang(e.target.value)}>
-                  {LANG_CODES.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </label>
-              <button type="button" onClick={saveGame} disabled={loading}>Download edited save</button>
-              <button type="button" className="button-danger" onClick={closeSave}>
-                Close save
-              </button>
-            </div>
-          </section>
+        <div className="app-shell">
+          <div className="app-main">
+            <section className="panel game-info">
+              <h2>Save Info</h2>
+              <dl>
+                <dt>File</dt><dd>{game.fileName}</dd>
+                <dt>Map</dt><dd>{game.mapName || '—'}</dd>
+                <dt>Version</dt><dd>{game.versionText}</dd>
+                <dt>Language</dt><dd>{game.lang.toUpperCase()}</dd>
+                <dt>Towns found</dt><dd>{game.towns.length}</dd>
+                <dt>Heroes on map</dt><dd>{mapHeroes.length}</dd>
+              </dl>
+            </section>
 
-          <section className="panel hero-search">
-            <h2>Find Hero</h2>
-            {heroesLoading ? (
-              <p className="hint heroes-loading" aria-live="polite">
-                Scanning save for heroes…
-              </p>
-            ) : allHeroes.length > 0 ? (
-              <>
-                <div className="player-filter row" role="group" aria-label="Filter by player">
-                  {ALL_PLAYERS.map((player) => (
-                    <label key={player} className="check">
-                      <input
-                        type="checkbox"
-                        checked={playerFilter.has(player)}
-                        onChange={() => togglePlayerFilter(player)}
-                      />
-                      {formatPlayerLabel(player)}
-                    </label>
-                  ))}
-                </div>
-                <div className="row">
-                  <select
-                    value={heroSelection}
-                    onChange={(e) => {
-                      const key = e.target.value;
-                      setHeroSelection(key);
-                      searchHero(key);
-                    }}
-                    disabled={filteredHeroes.length === 0}
-                  >
-                    <option value="">
-                      {filteredHeroes.length === 0 ? 'No heroes for selected players…' : 'Select a hero…'}
-                    </option>
-                    {heroGroups.map((group) => (
-                      <optgroup key={group.label} label={group.label}>
-                        {group.heroes.map((h) => (
-                          <option key={h.key} value={h.key}>{h.name}</option>
-                        ))}
-                      </optgroup>
+            <section className="panel hero-search">
+              <h2>Find Hero</h2>
+              {heroesLoading ? (
+                <p className="hint heroes-loading" aria-live="polite">
+                  Scanning save for heroes…
+                </p>
+              ) : allHeroes.length > 0 ? (
+                <>
+                  <div className="player-filter row" role="group" aria-label="Filter by player">
+                    {ALL_PLAYERS.map((player) => (
+                      <label key={player} className="check">
+                        <input
+                          type="checkbox"
+                          checked={playerFilter.has(player)}
+                          onChange={() => togglePlayerFilter(player)}
+                        />
+                        {formatPlayerLabel(player)}
+                      </label>
                     ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => searchHero(heroSelection)}
-                    disabled={!heroSelection}
-                  >
-                    Find next
-                  </button>
-                </div>
-                <p className="hint">Use Find next to open another instance of the selected hero.</p>
-              </>
-            ) : (
-              <p className="hint">No heroes detected in this save.</p>
-            )}
-          </section>
+                  </div>
+                  <div className="row">
+                    <select
+                      value={heroSelection}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        setHeroSelection(key);
+                        searchHero(key);
+                      }}
+                      disabled={filteredHeroes.length === 0}
+                    >
+                      <option value="">
+                        {filteredHeroes.length === 0 ? 'No heroes for selected players…' : 'Select a hero…'}
+                      </option>
+                      {heroGroups.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                          {group.heroes.map((h) => (
+                            <option key={h.key} value={h.key}>{h.name}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => searchHero(heroSelection)}
+                      disabled={!heroSelection}
+                    >
+                      Find next
+                    </button>
+                  </div>
+                  <p className="hint">Use Find next to open another instance of the selected hero.</p>
+                </>
+              ) : (
+                <p className="hint">No heroes detected in this save.</p>
+              )}
+            </section>
 
-          {openHeroes.map((hero, idx) => (
-            <HeroEditor
-              key={`${hero.name}-${hero.bytePosition}-${idx}`}
-              hero={hero}
-              skills={Skills.names}
-              skillLevels={SkillLevels.names}
-              spells={Spells.names}
-              creatureGroups={creatureGroups}
-              inventoryArtifactGroups={inventoryArtifactGroups}
-              warMachines={WarMachines.originalNames}
-            />
-          ))}
-        </>
+            {openHeroes.map((hero, idx) => (
+              <HeroEditor
+                key={`${hero.name}-${hero.bytePosition}-${idx}`}
+                hero={hero}
+                skills={Skills.names}
+                skillLevels={SkillLevels.names}
+                spells={Spells.names}
+                creatureGroups={creatureGroups}
+                inventoryArtifactGroups={inventoryArtifactGroups}
+                warMachines={WarMachines.originalNames}
+                onChange={notifyHeroEdited}
+              />
+            ))}
+          </div>
+
+          <ChangesSidebar
+            uiLang={uiLang}
+            langCodes={LANG_CODES}
+            loading={loading}
+            onUiLangChange={changeUiLang}
+            onDownload={saveGame}
+            onClose={closeSave}
+            onSelectHero={selectHeroFromSidebar}
+          />
+        </div>
       )}
 
       <footer className="app-footer">

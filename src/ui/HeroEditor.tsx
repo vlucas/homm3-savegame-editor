@@ -20,6 +20,7 @@ interface Props {
   creatureGroups: CreatureGroup[];
   inventoryArtifactGroups: ArtifactGroup[];
   warMachines: string[];
+  onChange?: () => void;
 }
 
 export function HeroEditor({
@@ -30,12 +31,20 @@ export function HeroEditor({
   creatureGroups,
   inventoryArtifactGroups,
   warMachines,
+  onChange,
 }: Props) {
   const [, tick] = useState(0);
-  const refresh = () => tick((n) => n + 1);
+  const refresh = () => {
+    tick((n) => n + 1);
+    onChange?.();
+  };
 
   return (
-    <section className="panel hero-editor">
+    <section
+      className="panel hero-editor"
+      id={`hero-editor-${hero.bytePosition}`}
+      data-hero-pos={hero.bytePosition}
+    >
       <h2>{hero.name} <span className="meta">@ 0x{hero.bytePosition.toString(16)}</span></h2>
 
       <fieldset>

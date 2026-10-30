@@ -203,6 +203,79 @@ describe('present heroes', () => {
   });
 });
 
+describe('hero-diff', () => {
+  function stubHero(overrides: Record<string, unknown> = {}) {
+    const equippedArtifacts = {
+      Helm: '-', Neck: '-', Armor: '-', Cloak: '-', Boots: '-',
+      Weapon: '-', Shield: '-', LeftRing: '-', RightRing: '-',
+      Item1: '-', Item2: '-', Item3: '-', Item4: '-', Item5: '-',
+    };
+    return {
+      attributes: new Int8Array([1, 1, 1, 1]),
+      level: 5,
+      experience: 1000,
+      mana: 10,
+      spellBookExist: false,
+      skills: Array(8).fill(null),
+      skillLevels: new Uint8Array(8),
+      creatures: Array(7).fill(null),
+      creatureAmounts: new Int32Array(7),
+      warMachines: new Set<string>(),
+      equippedArtifacts,
+      equippedSpellScrolls: {
+        Item1: '', Item2: '', Item3: '', Item4: '', Item5: '',
+      },
+      spellBook: new Set<string>(),
+      inventory: [] as string[],
+      inventorySpellScrolls: new Map<number, string>(),
+      ...overrides,
+    };
+  }
+
+  it('reports spellbook, skill, and artifact adds', async () => {
+    const { snapshotHero, diffHero } = await import('../src/core/hero-diff');
+    const baselineHero = stubHero({
+      skills: ['Navigation', null, null, null, null, null, null, null],
+      skillLevels: new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]),
+    }) as never;
+    const baseline = snapshotHero(baselineHero);
+
+    const current = stubHero({
+      spellBookExist: true,
+      skills: ['Logistics', null, null, null, null, null, null, null],
+      skillLevels: new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]),
+      equippedArtifacts: {
+        Helm: '-', Neck: '-', Armor: '-', Cloak: '-', Boots: 'Boots of Speed',
+        Weapon: '-', Shield: '-', LeftRing: '-', RightRing: '-',
+        Item1: '-', Item2: '-', Item3: '-', Item4: '-', Item5: '-',
+      },
+    }) as never;
+
+    const lines = diffHero(baseline, current);
+    expect(lines.map((l) => `${l.category}: ${l.text}`)).toEqual([
+      'Item: Add Spellbook',
+      'Skill: Add Logistics (Basic)',
+      'Skill: Remove Navigation (Basic)',
+      "Artifact: Add 'Boots of Speed' (Feet)",
+    ]);
+  });
+
+  it('reports skill level changes', async () => {
+    const { snapshotHero, diffHero } = await import('../src/core/hero-diff');
+    const baseline = snapshotHero(stubHero({
+      skills: ['Logistics', null, null, null, null, null, null, null],
+      skillLevels: new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]),
+    }) as never);
+    const current = stubHero({
+      skills: ['Logistics', null, null, null, null, null, null, null],
+      skillLevels: new Uint8Array([3, 0, 0, 0, 0, 0, 0, 0]),
+    }) as never;
+    expect(diffHero(baseline, current).map((l) => l.text)).toEqual([
+      'Change Logistics (Basic → Expert)',
+    ]);
+  });
+});
+
 describe('gzip wasm', () => {
   it('compresses and decompresses raw save bytes', async () => {
     const { readFileSync } = await import('node:fs');
