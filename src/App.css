@@ -17,6 +17,13 @@
   --muted: #9a8b68;
   --error: #b04030;
   --info: #3a6b48;
+  --green-bright: #c6db9a;
+  --green: #7da84e;
+  --green-deep: #4e7a34;
+  --green-dim: #2d4a22;
+  --green-panel: #314828;
+  --green-panel-deep: #1c2e18;
+  --green-text: #e7f2d4;
   --bevel-light: rgba(232, 200, 74, 0.55);
   --bevel-dark: rgba(10, 8, 0, 0.75);
 
@@ -158,6 +165,30 @@ body {
   gap: 0.45rem;
   width: 100%;
   margin-top: 0.85rem;
+  color: var(--green-text);
+  background: linear-gradient(180deg, var(--green-panel) 0%, var(--green-panel-deep) 100%);
+  border: 2px solid var(--green);
+  box-shadow:
+    inset 1px 1px 0 rgba(198, 219, 154, 0.38),
+    inset -1px -1px 0 rgba(8, 16, 6, 0.75),
+    1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.button-download:hover:not(:disabled) {
+  color: var(--green-text);
+  background: linear-gradient(180deg, #3a5530 0%, #243820 100%);
+  border-color: var(--green-bright);
+}
+
+.button-download:active:not(:disabled) {
+  background: linear-gradient(180deg, #243820 0%, #152214 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.55),
+    inset -1px -1px 0 rgba(198, 219, 154, 0.2);
+}
+
+.button-download:focus-visible {
+  outline-color: var(--green-bright);
 }
 
 .button-download-icon {
@@ -315,6 +346,24 @@ body {
 }
 
 /* —— Intro (pre-upload) —— */
+.landing-lead {
+  margin: -0.35rem 0 0.85rem;
+  text-align: center;
+  color: var(--parchment);
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+
+.landing-features .panel {
+  margin-top: 1.15rem;
+}
+
 .intro h2 {
   margin-bottom: 0.65rem;
 }
@@ -359,32 +408,62 @@ body {
   color: var(--gold-bright);
 }
 
+.preview-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  margin-top: 0.75rem;
+}
+
+.preview-gallery figure {
+  margin: 0;
+}
+
+.preview-gallery img {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  padding: 8px;
+  background: #f3ead4;
+  border: 2px solid #8d7340;
+  border-radius: 2px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.preview-gallery figcaption {
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 /* —— Dropzone —— */
 .dropzone {
   position: relative;
   cursor: pointer;
   text-align: center;
-  padding: 2rem 1.5rem;
+  padding: 2.4rem 1.5rem;
   background:
-    linear-gradient(180deg, #3d2818 0%, #2e1c12 100%);
-  border: 2px solid var(--gold-dim);
+    linear-gradient(180deg, var(--green-panel) 0%, var(--green-panel-deep) 100%);
+  border: 2px solid var(--green);
   border-radius: 2px;
   box-shadow:
-    inset 1px 1px 0 var(--bevel-light),
-    inset -1px -1px 0 var(--bevel-dark),
-    0 0 0 1px var(--bronze),
+    inset 1px 1px 0 rgba(198, 219, 154, 0.38),
+    inset -1px -1px 0 rgba(8, 16, 6, 0.75),
+    0 0 0 1px var(--green-dim),
     3px 3px 0 rgba(0, 0, 0, 0.45);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.dropzone:hover {
-  border-color: var(--gold);
+.dropzone:hover,
+.dropzone:focus-within {
+  border-color: var(--green-bright);
   box-shadow:
-    inset 1px 1px 0 var(--bevel-light),
-    inset -1px -1px 0 var(--bevel-dark),
-    0 0 0 1px var(--gold-dim),
+    inset 1px 1px 0 rgba(214, 232, 176, 0.5),
+    inset -1px -1px 0 rgba(8, 16, 6, 0.75),
+    0 0 0 1px var(--green),
     3px 3px 0 rgba(0, 0, 0, 0.45),
-    0 0 20px rgba(201, 162, 39, 0.12);
+    0 0 22px rgba(125, 168, 78, 0.28);
 }
 
 .dropzone p {
@@ -392,7 +471,7 @@ body {
   font-family: Cinzel, serif;
   font-size: 0.95rem;
   letter-spacing: 0.04em;
-  color: var(--parchment-light);
+  color: var(--green-text);
 }
 
 .dropzone input[type='file'] {
@@ -501,7 +580,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  .skills-grid {
+  .skills-grid,
+  .landing-features {
     grid-template-columns: 1fr;
   }
 }
@@ -668,6 +748,39 @@ button.button-danger:hover:not(:disabled) {
   background: linear-gradient(180deg, #1e3a28 0%, #142418 100%);
   border-color: var(--info);
   color: #c8e0c8;
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(8, 4, 2, 0.72);
+}
+
+.confirm-dialog {
+  width: min(26rem, 100%);
+  margin: 0;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--parchment);
+  line-height: 1.45;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.confirm-actions button {
+  margin: 0;
 }
 
 .hint {

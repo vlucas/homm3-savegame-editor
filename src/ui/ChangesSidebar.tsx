@@ -79,6 +79,8 @@ export function ChangesSidebar({
     return counts;
   }, [townGroups]);
 
+  const hasEdits = heroGroups.length > 0 || townGroups.length > 0;
+
   return (
     <aside className="app-sidebar" aria-label="Save controls and edit preview">
       <label className="sidebar-lang">
@@ -102,10 +104,8 @@ export function ChangesSidebar({
           </button>
         </div>
 
-        <div className="changes-body">
-          {heroGroups.length === 0 && townGroups.length === 0 ? (
-            <p className="hint">No edits yet</p>
-          ) : (
+        {hasEdits && (
+          <div className="changes-body">
             <div className="changes-list">
               {heroGroups.map(({ hero, lines }) => {
                 const showPos = (heroNameCounts.get(hero.name) ?? 0) > 1;
@@ -162,30 +162,32 @@ export function ChangesSidebar({
                 );
               })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <button
-          type="button"
-          className="button-download"
-          onClick={onDownload}
-          disabled={loading}
-        >
-          <svg
-            className="button-download-icon"
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            aria-hidden="true"
-            focusable="false"
+        {hasEdits && (
+          <button
+            type="button"
+            className="button-download"
+            onClick={onDownload}
+            disabled={loading}
           >
-            <path
-              fill="currentColor"
-              d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"
-            />
-          </svg>
-          Download edited save
-        </button>
+            <svg
+              className="button-download-icon"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="currentColor"
+                d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"
+              />
+            </svg>
+            Download edited save
+          </button>
+        )}
       </div>
     </aside>
   );
