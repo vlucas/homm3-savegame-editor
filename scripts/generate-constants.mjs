@@ -16,6 +16,7 @@ function parseDictKey(key) {
   if (key.startsWith('Empty')) return 0xff;
   if (key === 'BulwarkStartCode' || key.endsWith('.BulwarkStartCode')) return 186;
   if (key === 'BALLISTA' || key.endsWith('.BALLISTA')) return 0x04;
+  if (key === 'TitansLightningBolt' || key.endsWith('.TitansLightningBolt')) return 57;
   if (key.includes('.')) return NaN;
   if (key.startsWith('0x') || key.startsWith('0X')) return parseInt(key, 16);
   const num = Number(key);
@@ -113,10 +114,21 @@ while ((sg = spellGroupRe.exec(itemSpellsBlock))) {
   itemSpells[keyName] = spells;
 }
 
+/** Spell levels per https://heroes.thelazy.net/index.php/List_of_spells */
+const spellLevelByCode = {
+  0: 1, 1: 2, 2: 2, 3: 1, 4: 2, 5: 1, 6: 5, 7: 4, 8: 5, 9: 4,
+  10: 2, 11: 3, 12: 3, 13: 2, 14: 3, 15: 1, 16: 2, 17: 2, 18: 5, 19: 4,
+  20: 3, 21: 3, 22: 4, 23: 4, 24: 2, 25: 3, 26: 4, 27: 1, 28: 3, 29: 4,
+  30: 2, 31: 1, 32: 1, 33: 3, 34: 3, 35: 1, 36: 5, 37: 1, 38: 4, 39: 3,
+  40: 5, 41: 1, 42: 1, 43: 1, 44: 2, 45: 2, 46: 1, 47: 2, 48: 4, 49: 3,
+  50: 4, 51: 2, 52: 3, 53: 1, 54: 1, 55: 4, 56: 4, 57: 5, 58: 4, 59: 4,
+  60: 3, 61: 3, 62: 2, 63: 3, 64: 2, 65: 4, 66: 5, 67: 5, 68: 5, 69: 5,
+};
+
 const outDir = path.join(root, 'src/core/generated');
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(
   path.join(outDir, 'lookup-data.json'),
-  JSON.stringify({ classes: generated, heroes, heroesHota, expLevels, itemSpells }, null, 2),
+  JSON.stringify({ classes: generated, heroes, heroesHota, expLevels, itemSpells, spellLevelByCode }, null, 2),
 );
 console.log('Wrote', path.join(outDir, 'lookup-data.json'));

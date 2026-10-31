@@ -30,16 +30,20 @@ import {
   reloadHotaReferenceCodes,
   removeHotaReferenceCodes,
 } from './constants';
-import { heroNamePattern, indexOfPattern, startsWith } from './bytes';
+import { heroNamePattern, indexOfPattern, startsWith, getUint16 } from './bytes';
 import { decodeSaveString, decodeWin1251, encodeWin1251 } from './encoding';
+import { TOWN_OWNER_OFFSET_HOTA, resolveTownFaction } from './town-constants';
 import { Hero } from './hero';
+import { Town } from './town';
+import { scanTownRecordStarts, readTownName, isHotATownLayout } from './town-scan';
 import { gzipCompress, gzipDecompress } from '../wasm/gzip';
 
-export interface Town {
+export interface TownSummary {
   name: string;
   faction: string;
   factionLang: string;
-  position: number;
+  bytePosition: number;
+  owner: number;
 }
 
 export interface PresentHero {
@@ -98,7 +102,8 @@ export class Game {
   mapName = '';
   mapDescription = '';
   heroes: Hero[] = [];
-  towns: Town[] = [];
+  towns: TownSummary[] = [];
+  openTowns: Town[] = [];
 
   private heroOffsets = { ...HERO_OFFSETS };
   private headerOffsets = { ...HEADER_OFFSETS };
@@ -130,7 +135,7 @@ export class Game {
     this.mapDescription = this.getStringByOffset(this.headerOffsets.MapName + 2 + this.mapName.length);
     this.versionText = `${this.version.major}.${this.version.minor} (${this.expansionLabel()})`;
     loadAllArtifacts();
-    this.searchTowns();
+    this.scanTowns();
   }
 
   get offsets() {
@@ -439,18 +444,61 @@ export class Game {
     return gzipCompress(this.bytes);
   }
 
-  searchTowns() {
+  scanTowns() {
+    this.towns = [];
+    const records = scanTownRecordStarts(this.bytes);
+    for (const bytePosition of records) {
+      const name = readTownName(this.bytes, bytePosition);
+      if (!name) continue;
+      const hotA = isHotATownLayout(this.bytes, bytePosition);
+      let typeId = 0;
+      let owner = 0;
+      if (hotA) {
+        owner = this.bytes[bytePosition + TOWN_OWNER_OFFSET_HOTA];
+      } else {
+        const len = getUint16(this.bytes, bytePosition + 0x4e);
+        const meta = bytePosition + 0x50 + len;
+        typeId = getUint16(this.bytes, meta);
+        owner = getUint16(this.bytes, meta + 2);
+      }
+      const faction = resolveTownFaction(typeId, name, (town) => Towns.factionForTown(town));
+      this.towns.push({
+        name,
+        faction,
+        factionLang: Towns.getLangFactionValue(faction),
+        bytePosition,
+        owner,
+      });
+    }
+    this.towns.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }
+
+  openTown(bytePosition: number): Town | null {
+    const summary = this.towns.find((t) => t.bytePosition === bytePosition);
+    if (!summary) return null;
+    const existing = this.openTowns.find((t) => t.bytePosition === bytePosition);
+    if (existing) {
+      this.openTowns = [existing];
+      return existing;
+    }
+    const town = new Town(this, bytePosition);
+    this.openTowns = [town];
+    return town;
+  }
+
+  /** Legacy name-catalog town search; scanTowns() replaces this for listing. */
+  searchTownsLegacy() {
     this.towns = [];
     let position = this.bytes.length;
     for (const faction of Towns.factions) {
       for (const town of Towns.get(faction)) {
         const found = this.searchTown(town, faction, position);
-        if (found) position = found.position;
+        if (found) position = found.bytePosition;
       }
     }
   }
 
-  private searchTown(town: string, faction: string, position: number): Town | null {
+  private searchTown(town: string, faction: string, position: number): TownSummary | null {
     const isCyrillic = /\p{Script=Cyrillic}/u.test(town);
     const pattern = isCyrillic ? encodeWin1251(town) : new TextEncoder().encode(town);
     for (let i = position - pattern.length; i > 0; i--) {
@@ -462,15 +510,16 @@ export class Game {
         }
       }
       if (!found) continue;
-      if (this.towns.some((t) => t.position === i)) return null;
+      if (this.towns.some((t) => t.bytePosition === i)) return null;
       const prev = this.bytes[i - 1];
       const next = this.bytes[i + pattern.length];
       if (isLetter(prev) || isLetter(next) || prev === 0x20 || next === 0x20) continue;
-      const entry: Town = {
+      const entry: TownSummary = {
         name: town,
         faction,
         factionLang: Towns.getLangFactionValue(faction),
-        position: i,
+        bytePosition: i,
+        owner: 0,
       };
       this.towns.push(entry);
       return entry;
