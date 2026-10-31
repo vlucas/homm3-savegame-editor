@@ -870,6 +870,23 @@ button.button-danger:hover:not(:disabled) {
   gap: 0.25rem 0.85rem;
 }
 
+.building-chains-dwellings .building-chain-options {
+  display: block;
+}
+
+.building-chains-dwellings .building-chain-options > .check {
+  display: block;
+  margin-bottom: 0.28rem;
+}
+
+.building-chains-dwellings .building-chain-options > .check:last-child {
+  margin-bottom: 0;
+}
+
+.building-chains-dwellings .building-chain-options > .check input {
+  margin-right: 0.4rem;
+}
+
 .building-subhead {
   margin: 0.75rem 0 0.4rem;
   font-size: 0.95rem;
